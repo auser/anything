@@ -4,6 +4,7 @@ pub mod error;
 pub(crate) mod events;
 // pub(crate) mod handlers;
 // pub(crate) mod models;
+pub(crate) mod fs;
 pub(crate) mod processing;
 
 #[cfg(debug_assertions)]

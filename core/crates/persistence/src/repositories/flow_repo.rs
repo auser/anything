@@ -406,7 +406,7 @@ impl FlowRepo for FlowRepoImpl {
     async fn reset(&self) -> PersistenceResult<()> {
         let mut tx = self.get_transaction().await?;
 
-        let res = self.internal_reset(&mut tx).await?;
+        let _res = self.internal_reset(&mut tx).await?;
         tx.commit().await?;
 
         Ok(())
@@ -833,14 +833,9 @@ mod tests {
         let test_helper = TestFlowHelper::new(datastore.clone());
         let flow_repo = FlowRepoImpl::new_with_datastore(datastore).unwrap();
 
-        let create_flows = test_helper
-            .make_create_flows(vec!["alpha".to_string(), "beta".to_string()])
+        let _flow_ids = test_helper
+            .create_flows(&["alpha", "beta"], flow_repo.clone())
             .await;
-
-        for f in create_flows {
-            let res = flow_repo.create_flow(f.clone()).await;
-            assert!(res.is_ok());
-        }
 
         let flows = flow_repo.get_flows().await.unwrap();
         assert!(flows.len() == 2);
@@ -854,16 +849,13 @@ mod tests {
         let test_helper = TestFlowHelper::new(datastore.clone());
         let flow_repo = FlowRepoImpl::new_with_datastore(datastore).unwrap();
 
-        let create_flows = test_helper
-            .make_create_flows(vec!["alpha".to_string(), "beta".to_string()])
+        let flow_ids = test_helper
+            .create_flows(&["alpha", "beta"], flow_repo.clone())
             .await;
 
-        for f in create_flows {
-            let res = flow_repo.create_flow(f.clone()).await;
-            assert!(res.is_ok());
-        }
+        let alpha_flow_id = flow_ids.get("alpha").unwrap().clone();
 
-        let flows = flow_repo.get_flow_by_id("alpha".to_string()).await;
+        let flows = flow_repo.get_flow_by_id(alpha_flow_id).await;
         assert!(flows.is_ok());
         assert_eq!(flows.unwrap().flow_name, "alpha");
     }
@@ -874,14 +866,9 @@ mod tests {
         let test_helper = TestFlowHelper::new(datastore.clone());
         let flow_repo = FlowRepoImpl::new_with_datastore(datastore).unwrap();
 
-        let create_flows = test_helper
-            .make_create_flows(vec!["alpha".to_string(), "beta".to_string()])
+        let _flow_ids = test_helper
+            .create_flows(&["alpha", "beta"], flow_repo.clone())
             .await;
-
-        for f in create_flows {
-            let res = flow_repo.create_flow(f.clone()).await;
-            assert!(res.is_ok());
-        }
 
         let flows = flow_repo.get_flow_by_name("beta".to_string()).await;
         assert!(flows.is_ok());
@@ -914,29 +901,44 @@ mod tests {
         let test_helper = TestFlowHelper::new(datastore.clone());
         let flow_repo = FlowRepoImpl::new_with_datastore(datastore).unwrap();
 
-        let flow_name = "test".to_string();
-        let create_flow = test_helper.make_create_flow(flow_name.clone()).await;
-        let res = flow_repo.create_flow(create_flow.clone()).await;
-        assert!(res.is_ok());
+        let flow_ids = test_helper
+            .create_flows(&["alpha", "beta"], flow_repo.clone())
+            .await;
 
+        // let create_flow = test_helper.make_create_flow(flow_name.clone()).await;
+        // let res = flow_repo.create_flow(create_flow.clone()).await;
+        // assert!(res.is_ok());
+
+        let alpha_flow_id = flow_ids.get("alpha").unwrap().clone();
         let create_flow_version = test_helper
-            .make_flow_version(flow_name.clone(), format!("v0.0.{}", 1))
+            .make_flow_version(alpha_flow_id.clone(), format!("v0.0.{}", 1))
             .await;
         let flow_version = flow_repo
-            .create_flow_version(flow_name.clone(), create_flow_version.clone())
+            .create_flow_version(alpha_flow_id.clone(), create_flow_version.clone())
             .await;
         assert!(flow_version.is_ok());
 
         let flow_version = flow_version.unwrap();
-        assert_eq!(flow_version.flow_id, flow_name);
+        let flow = test_helper
+            .get_flow_by_id(flow_version.flow_id.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(flow_version.flow_id, flow.flow_id);
         assert_eq!(flow_version.flow_version, "v0.0.1");
 
         let flow_version = flow_repo
-            .get_flow_version_by_id(flow_name.clone(), "v0.0.0".to_string())
+            .get_flow_version_by_id(alpha_flow_id.clone(), "v0.0.0".to_string())
             .await;
         assert!(flow_version.is_ok());
+
         let flow_version = flow_version.unwrap();
-        assert_eq!(flow_version.flow_id, flow_name);
+        // Get the flow associted with the flow_version
+        let flow = test_helper
+            .get_flow_by_id(flow_version.flow_id.clone())
+            .await
+            .unwrap();
+        assert_eq!(flow_version.flow_id, flow.flow_id);
         assert_eq!(flow_version.flow_version, "v0.0.0");
     }
 
@@ -946,29 +948,33 @@ mod tests {
         let test_helper = TestFlowHelper::new(datastore.clone());
         let flow_repo = FlowRepoImpl::new_with_datastore(datastore).unwrap();
 
-        let create_flow = test_helper.make_create_flow("test".to_string()).await;
+        let flow_ids = test_helper
+            .create_flows(&["alpha", "beta"], flow_repo.clone())
+            .await;
 
-        let res = flow_repo.create_flow(create_flow.clone()).await;
-        assert!(res.is_ok());
+        let alpha_flow_id = flow_ids.get("alpha").unwrap().clone();
+        let created_flow = test_helper
+            .get_flow_by_id(alpha_flow_id.clone())
+            .await
+            .unwrap();
 
-        let flow_name = create_flow.name.clone();
         let mut created_flow_flow_version = vec![];
         for i in 1..5 {
             let create_flow_version = test_helper
-                .make_flow_version(flow_name.clone(), format!("v0.0.{}", i))
+                .make_flow_version(alpha_flow_id.clone(), format!("v0.0.{}", i))
                 .await;
             let res = flow_repo
-                .create_flow_version(flow_name.clone(), create_flow_version.clone())
+                .create_flow_version(alpha_flow_id.clone(), create_flow_version.clone())
                 .await;
             assert!(res.is_ok());
             created_flow_flow_version.push(res.unwrap());
         }
 
-        let flows = flow_repo.get_flow_versions("test".to_string()).await;
+        let flows = flow_repo.get_flow_versions(alpha_flow_id).await;
         assert!(flows.is_ok());
         let flows = flows.unwrap();
         assert_eq!(flows.len(), 5);
-        assert_eq!(flows[4].flow_id, "test");
+        assert_eq!(flows[4].flow_id, created_flow.flow_id);
     }
 
     #[tokio::test]
@@ -977,9 +983,12 @@ mod tests {
         let test_helper = TestFlowHelper::new(datastore.clone());
         let flow_repo = FlowRepoImpl::new_with_datastore(datastore).unwrap();
 
-        let create_flow = test_helper.make_create_flow("test".to_string()).await;
-        let res = flow_repo.create_flow(create_flow.clone()).await;
-        assert!(res.is_ok());
+        let flow_ids = test_helper
+            .create_flows(&["alpha", "beta"], flow_repo.clone())
+            .await;
+        // let create_flow = test_helper.create_flow("test").await;
+        // let res = flow_repo.create_flow(create_flow.clone()).await;
+        // assert!(res.is_ok());
 
         let update_flow = UpdateFlowArgs {
             flow_name: "test2".to_string(),
@@ -987,8 +996,10 @@ mod tests {
             version: None,
         };
 
+        let created_flow_id = flow_ids.get("alpha").unwrap().clone();
+
         let res = flow_repo
-            .update_flow(create_flow.name.clone(), update_flow)
+            .update_flow(created_flow_id.clone(), update_flow)
             .await;
         assert!(res.is_ok());
         let res = res.unwrap();
@@ -1088,14 +1099,9 @@ mod tests {
         let test_helper = TestFlowHelper::new(datastore.clone());
         let flow_repo = FlowRepoImpl::new_with_datastore(datastore).unwrap();
 
-        let create_flows = test_helper
-            .make_create_flows(vec!["alpha".to_string(), "beta".to_string()])
+        let flow_ids = test_helper
+            .create_flows(&["alpha", "beta"], flow_repo.clone())
             .await;
-
-        for f in create_flows {
-            let res = flow_repo.create_flow(f.clone()).await;
-            assert!(res.is_ok());
-        }
 
         let all_flows = test_helper
             .select_all_flows()
@@ -1103,7 +1109,8 @@ mod tests {
             .expect("unable to select all flows");
         assert_eq!(all_flows.len(), 2);
 
-        let res = flow_repo.delete_flow("alpha".to_string()).await;
+        let flow_id = flow_ids.get("alpha").unwrap().clone();
+        let res = flow_repo.delete_flow(flow_id.to_string()).await;
         assert!(res.is_ok());
 
         let all_flows = test_helper
@@ -1123,29 +1130,28 @@ mod tests {
         let create_flow = test_helper.make_create_flow(flow_name.clone()).await;
         let res = flow_repo.create_flow(create_flow.clone()).await;
         assert!(res.is_ok());
+        let flow_id = res.unwrap().flow_id;
 
         // Create first version
         let create_flow_version = test_helper
-            .make_flow_version(flow_name.clone(), format!("v0.0.{}", 1))
+            .make_flow_version(flow_id.clone(), format!("v0.0.{}", 1))
             .await;
         let res = flow_repo
-            .create_flow_version(flow_name.clone(), create_flow_version.clone())
+            .create_flow_version(flow_id.clone(), create_flow_version.clone())
             .await;
         assert!(res.is_ok());
 
         // Create a second version
         let create_flow_version = test_helper
-            .make_flow_version(flow_name.clone(), format!("v0.0.{}", 2))
+            .make_flow_version(flow_id.clone(), format!("v0.0.{}", 2))
             .await;
         let res = flow_repo
-            .create_flow_version(flow_name.clone(), create_flow_version.clone())
+            .create_flow_version(flow_id.clone(), create_flow_version.clone())
             .await;
         assert!(res.is_ok());
 
         // Confirm there are two versions
-        let flow_versions = test_helper
-            .select_all_flow_versions(flow_name.clone())
-            .await;
+        let flow_versions = test_helper.select_all_flow_versions(flow_id.clone()).await;
 
         assert!(flow_versions.is_ok());
         assert_eq!(flow_versions.unwrap().len(), 3);
@@ -1158,9 +1164,7 @@ mod tests {
         assert!(res);
 
         // Confirm there is one version
-        let flow_versions = test_helper
-            .select_all_flow_versions(flow_name.clone())
-            .await;
+        let flow_versions = test_helper.select_all_flow_versions(flow_id.clone()).await;
 
         assert!(flow_versions.is_ok());
         assert_eq!(flow_versions.unwrap().len(), 2);

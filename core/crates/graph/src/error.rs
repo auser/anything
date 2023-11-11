@@ -30,6 +30,9 @@ pub enum GraphError {
     #[error("flow file parsing error")]
     FlowFileParsingError(#[from] toml::de::Error),
 
+    #[error("flow file serialize json error")]
+    FlowFileSerializeJsonError(#[from] serde_json::Error),
+
     #[error("Runtime error: {0}")]
     RuntimeError(String),
 

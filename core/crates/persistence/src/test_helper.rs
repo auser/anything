@@ -1,8 +1,10 @@
 #![allow(unused)]
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::datastore::types::DatastoreTrait;
 use crate::datastore::types::RepoImpl;
+use crate::flow_repo;
 use crate::models::event::StoreEvent;
 use crate::models::flow::{CreateFlow, CreateFlowVersion, FlowVersion, StoredFlow};
 use crate::models::trigger::StoredTrigger;
@@ -13,6 +15,7 @@ use crate::{
     error::{PersistenceError, PersistenceResult},
 };
 use anything_common::tracing;
+use anything_graph::Flow;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::SqlitePool;
 
@@ -77,12 +80,28 @@ impl TestFlowHelper {
         Ok(result)
     }
 
-    pub async fn make_create_flows(&self, names: Vec<String>) -> Vec<CreateFlow> {
+    pub async fn make_create_flows(&self, names: &[&str]) -> Vec<CreateFlow> {
         let mut flows = Vec::default();
         for name in names {
-            flows.push(self.make_create_flow(name).await);
+            flows.push(self.make_create_flow(name.to_string()).await);
         }
         flows
+    }
+
+    pub async fn create_flows(
+        &self,
+        flows: &[&str],
+        flow_repo: FlowRepoImpl,
+    ) -> HashMap<String, String> {
+        let create_flows = self.make_create_flows(flows).await;
+
+        let mut flow_ids = HashMap::new();
+        for f in create_flows {
+            let res = flow_repo.create_flow(f.clone()).await;
+            assert!(res.is_ok());
+            flow_ids.insert(f.name.clone(), res.unwrap().flow_id);
+        }
+        flow_ids
     }
 
     pub async fn make_create_flow(&self, name: String) -> CreateFlow {

@@ -57,6 +57,14 @@ impl Flowfile {
     pub fn from_string(parsed_contents: String) -> GraphResult<Self> {
         Ok(Self::from_str(&parsed_contents)?)
     }
+
+    pub fn into_json(self) -> GraphResult<String> {
+        serde_json::to_string(&self).map_err(|e| GraphError::FlowFileSerializeJsonError(e))
+    }
+
+    pub fn from_json(json: String) -> GraphResult<Self> {
+        serde_json::from_str(&json).map_err(|e| GraphError::FlowFileSerializeJsonError(e))
+    }
 }
 
 impl FromStr for Flowfile {
@@ -271,5 +279,35 @@ mod tests {
         let flow = Flowfile::from_file(simple_flow).unwrap();
         assert_eq!(flow.name, "SimpleFlow".to_string());
         assert_eq!(flow.nodes.len(), 3);
+    }
+
+    #[test]
+    fn test_serialize_flow_definition() {
+        let fixture_directory = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("resources");
+        let simple_flow = fixture_directory.join("simple.toml");
+
+        let flowfile = Flowfile::from_file(simple_flow).unwrap();
+        let serialized_flow = flowfile.into_json().unwrap();
+
+        assert!(serialized_flow.contains(format!("\"name\":\"SimpleFlow\"").as_str()));
+    }
+
+    #[test]
+    fn test_deserialize_flow_definition() {
+        let fixture_directory = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("resources");
+        let simple_flow = fixture_directory.join("simple.toml");
+
+        let flowfile = Flowfile::from_file(simple_flow).unwrap();
+        let original_flow_id = flowfile.flow.flow_id.clone();
+        let serialized_flow = flowfile.into_json().unwrap();
+
+        let flowfile: Flowfile = Flowfile::from_json(serialized_flow).unwrap();
+
+        assert!(flowfile.name.contains("SimpleFlow"));
+        assert_eq!(flowfile.flow.flow_id, original_flow_id);
     }
 }
