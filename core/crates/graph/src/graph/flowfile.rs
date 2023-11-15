@@ -58,7 +58,7 @@ impl Flowfile {
         Ok(Self::from_str(&parsed_contents)?)
     }
 
-    pub fn into_json(self) -> GraphResult<String> {
+    pub fn into_json_string(self) -> GraphResult<String> {
         serde_json::to_string(&self).map_err(|e| GraphError::FlowFileSerializeJsonError(e))
     }
 
@@ -96,6 +96,12 @@ impl Into<String> for Flowfile {
         flow.nodes = self.nodes;
 
         toml::to_string(&flow).unwrap()
+    }
+}
+
+impl Into<serde_json::Value> for Flowfile {
+    fn into(self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap()
     }
 }
 
@@ -289,7 +295,7 @@ mod tests {
         let simple_flow = fixture_directory.join("simple.toml");
 
         let flowfile = Flowfile::from_file(simple_flow).unwrap();
-        let serialized_flow = flowfile.into_json().unwrap();
+        let serialized_flow = flowfile.into_json_string().unwrap();
 
         assert!(serialized_flow.contains(format!("\"name\":\"SimpleFlow\"").as_str()));
     }
@@ -303,7 +309,7 @@ mod tests {
 
         let flowfile = Flowfile::from_file(simple_flow).unwrap();
         let original_flow_id = flowfile.flow.flow_id.clone();
-        let serialized_flow = flowfile.into_json().unwrap();
+        let serialized_flow = flowfile.into_json_string().unwrap();
 
         let flowfile: Flowfile = Flowfile::from_json(serialized_flow).unwrap();
 

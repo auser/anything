@@ -192,7 +192,7 @@ impl Manager {
     /// The function `get_flows` returns a `CoordinatorResult` containing a `Vec` of
     /// `anything_graph::Flow` objects.
     pub async fn get_flows(&self) -> CoordinatorResult<Vec<anything_graph::Flow>> {
-        let flow_repo = self.flow_repo()?;
+        let mut flow_repo = self.flow_repo()?;
         let mut file_store = self.file_store.clone();
         let flows = flow_repo.get_flows().await.map_err(|e| {
             tracing::error!("error when getting flows: {:#?}", e);
@@ -200,10 +200,13 @@ impl Manager {
         })?;
         let mut graph_flows: Vec<anything_graph::Flow> = vec![];
         for flow in flows.iter() {
-            let flow = flow.get_flow(&mut file_store).await.map_err(|e| {
-                tracing::error!("error when getting flow for flow {:#?}: {:#?}", flow, e);
-                CoordinatorError::PersistenceError(e)
-            })?;
+            let flow = flow
+                .get_flow(&mut file_store, &mut flow_repo)
+                .await
+                .map_err(|e| {
+                    tracing::error!("error when getting flow for flow {:#?}: {:#?}", flow, e);
+                    CoordinatorError::PersistenceError(e)
+                })?;
             graph_flows.push(flow.into());
         }
         Ok(graph_flows)
@@ -351,7 +354,9 @@ impl Manager {
     ) -> CoordinatorResult<anything_graph::Flow> {
         tracing::trace!("Update flow with {flow_id} and {:#?}", args);
         let new_flow_name = args.flow_name.clone();
-        let mut original_flow = self.flow_repo()?.get_flow_by_id(flow_id.clone()).await?;
+        let mut flow_repo = self.flow_repo()?;
+
+        let mut original_flow = flow_repo.get_flow_by_id(flow_id.clone()).await?;
         let original_flow_name = original_flow.flow_name.clone();
 
         tracing::trace!("original_flow: {:#?}", original_flow);
@@ -375,7 +380,9 @@ impl Manager {
             .expect("unable to write basic flow string");
         let mut file_store = self.file_store.clone();
 
-        let flow = stored_flow.get_flow(&mut file_store).await?;
+        let flow = stored_flow
+            .get_flow(&mut file_store, &mut flow_repo)
+            .await?;
         Ok(flow)
     }
 
@@ -735,6 +742,36 @@ mod tests {
         let test_flow = Flowfile::from_file(file).unwrap();
         let flow: Flow = test_flow.into();
         let _ = sleep(Duration::from_millis(SLEEP_TIME)).await;
+        dbg!(flow.clone());
+
+        let flow_repo = manager.flow_repo().unwrap();
+        flow_repo
+            .create_flow(CreateFlow {
+                name: flow.name.clone(),
+                active: false,
+                version: None,
+            })
+            .await
+            .unwrap();
+
+        let flow_id = flow.flow_id.clone();
+        let flow_file: Flowfile = flow.clone().into();
+        let flow_definition: serde_json::Value = flow_file.into();
+
+        flow_repo
+            .create_flow_version(
+                flow_id.clone(),
+                CreateFlowVersion {
+                    name: flow.name.clone(),
+                    flow_id: flow_id.clone(),
+                    version: Some("0.0.1".to_string()),
+                    flow_definition: flow_definition.clone(),
+                    published: None,
+                    description: None,
+                },
+            )
+            .await
+            .unwrap();
 
         // the actual test
         let server_task = tokio::spawn(async move {
@@ -752,7 +789,7 @@ mod tests {
             )
             .unwrap();
 
-            assert_eq!(res.len(), 3);
+            assert_eq!(res.len(), 3, "length of version is not 3");
             let messages = res.iter().map(|m| m.clone()).collect::<Vec<_>>();
             match messages.get(0).unwrap() {
                 ProcessorMessage::FlowTaskFinishedSuccessfully(task_name, result) => {
