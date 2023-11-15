@@ -112,7 +112,7 @@ impl FlowRepo for FlowRepoImpl {
         let mut tx = self.get_transaction().await?;
 
         let flow_id = uuid::Uuid::new_v4().to_string();
-        let flow_version = "0.0.0".to_string();
+        let flow_version = "0.0.1".to_string();
 
         let saved_flow = self
             .internal_save(&mut tx, flow_id, flow_version.clone(), create_flow.into())
@@ -695,6 +695,7 @@ impl FlowRepoImpl {
         }
     }
 
+    //TODO: deelte flow versions also.
     async fn internal_delete_flow_by_id(
         &self,
         tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
@@ -924,7 +925,7 @@ mod tests {
 
         let alpha_flow_id = flow_ids.get("alpha").unwrap().clone();
         let create_flow_version = test_helper
-            .make_flow_version(alpha_flow_id.clone(), format!("0.0.{}", 1))
+            .make_flow_version(alpha_flow_id.clone(), format!("0.0.{}", 2))
             .await;
         let flow_version = flow_repo
             .create_flow_version(alpha_flow_id.clone(), create_flow_version.clone())
@@ -938,16 +939,16 @@ mod tests {
             .unwrap();
 
         assert_eq!(flow_version.flow_id, flow.flow_id);
-        assert_eq!(flow_version.flow_version, "0.0.1");
+        assert_eq!(flow_version.flow_version, "0.0.2");
 
         let flow_version = flow_repo
-            .get_flow_version_by_id(alpha_flow_id.clone(), "0.0.0".to_string())
+            .get_flow_version_by_id(alpha_flow_id.clone(), "0.0.2".to_string())
             .await;
         assert!(flow_version.is_ok());
 
         let flow_version = flow_version.unwrap();
         assert_eq!(flow_version.flow_id, alpha_flow_id);
-        assert_eq!(flow_version.flow_version, "0.0.0");
+        assert_eq!(flow_version.flow_version, "0.0.2");
     }
 
     #[tokio::test]
@@ -1100,7 +1101,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(flow.name, "test".to_string());
-        assert_eq!(flow.version, "0.0.0".to_string());
+        assert_eq!(flow.version, "0.0.1".to_string());
         assert_eq!(flow.description, "test".to_string());
     }
 
@@ -1145,7 +1146,7 @@ mod tests {
 
         // Create first version
         let create_flow_version = test_helper
-            .make_flow_version(flow_name.clone(), format!("0.0.{}", 1))
+            .make_flow_version(flow_name.clone(), format!("0.0.{}", 2))
             .await;
         let res = flow_repo
             .create_flow_version(flow_id.clone(), create_flow_version.clone())
@@ -1154,7 +1155,7 @@ mod tests {
 
         // Create a second version
         let create_flow_version = test_helper
-            .make_flow_version(flow_name.clone(), format!("0.0.{}", 2))
+            .make_flow_version(flow_name.clone(), format!("0.0.{}", 3))
             .await;
         let res = flow_repo
             .create_flow_version(flow_id.clone(), create_flow_version.clone())

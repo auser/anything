@@ -236,13 +236,13 @@ impl Manager {
             tracing::error!("error when getting flow: {:#?}", e);
             CoordinatorError::PersistenceError(e)
         })?;
-        tracing::info!("db_flow: {:#?}", flow);
+        // tracing::info!("db_flow: {:#?}", flow);
         // Get the flow from disk
         // let flow = flow.get_flow(&mut file_store).await.map_err(|e| {
         //     tracing::error!("error when getting flow: {:#?}", e);
         //     CoordinatorError::PersistenceError(e)
         // })?;
-        tracing::info!("file_flow: {:#?}", flow);
+        // tracing::info!("file_flow: {:#?}", flow);
         Ok(flow.into())
     }
 
@@ -260,7 +260,7 @@ impl Manager {
     pub async fn create_flow(
         &mut self,
         flow_name: String,
-    ) -> CoordinatorResult<anything_graph::Flow> {
+    ) -> CoordinatorResult<anything_persistence::StoredFlow> {
         // Create flow model
         let create_flow = CreateFlow {
             name: flow_name.clone(),
@@ -268,51 +268,51 @@ impl Manager {
             version: None,
         };
 
-        tracing::debug!("Creating flow: {:#?}", create_flow);
+        // tracing::debug!("Creating flow: {:#?}", create_flow);
 
         let flow = self.flow_repo()?.create_flow(create_flow).await?;
 
-        tracing::debug!("Created flow in the repo: {:#?}", flow);
+        // tracing::debug!("Created flow in the repo: {:#?}", flow);
 
-        let new_directory = self
-            .file_store
-            .create_directory(&["flows", &flow.flow_name])
-            .expect("unable to create flow directory");
+        // let new_directory = self
+        //     .file_store
+        //     .create_directory(&["flows", &flow.flow_name])
+        //     .expect("unable to create flow directory");
 
-        tracing::debug!("Created flow directory: {:#?}", new_directory);
+        // tracing::debug!("Created flow directory: {:#?}", new_directory);
 
         // let flow: Flow = flow.clone().get_flow(&mut self.file_store).await.unwrap();
         // let flowfile: Flowfile = flow.clone().into();
-        let toml_repr = toml::to_string(&flow).expect("unable to convert StoredFlow into a string");
-        tracing::debug!("Saving flow toml representation: {:#?}", toml_repr);
-        let flowfile =
-            Flowfile::from_string(toml_repr).expect("unable to create flow file for a new flow");
-        let flow_str: String = flowfile.clone().into();
+        // let toml_repr = toml::to_string(&flow).expect("unable to convert StoredFlow into a string");
+        // tracing::debug!("Saving flow toml representation: {:#?}", toml_repr);
+        // let flowfile =
+        //     Flowfile::from_string(toml_repr).expect("unable to create flow file for a new flow");
+        // let flow_str: String = flowfile.clone().into();
 
         //TODO: why lowercase? folders are normal uppercase
-        let lowercased_flow_name = flow_name.to_lowercase();
-        let new_dir_str = new_directory
-            .to_str()
-            .expect("unable to create new directory string");
+        // let lowercased_flow_name = flow_name.to_lowercase();
+        // let new_dir_str = new_directory
+        //     .to_str()
+        //     .expect("unable to create new directory string");
 
-        tracing::debug!("new_dir_str: {:#?}", new_dir_str);
+        // tracing::debug!("new_dir_str: {:#?}", new_dir_str);
 
-        self.file_store
-            .write_file(
-                &["flows", new_dir_str, &format!("flow.toml")],
-                flow_str.as_bytes(),
-            )
-            .expect("unable to write basic flow string");
+        // self.file_store
+        //     .write_file(
+        //         &["flows", new_dir_str, &format!("flow.toml")],
+        //         flow_str.as_bytes(),
+        //     )
+        //     .expect("unable to write basic flow string");
 
-        tracing::debug!(
-            "wrote flow file at {:#?}",
-            &[
-                "flows",
-                new_dir_str,
-                &format!("{}.toml", lowercased_flow_name),
-            ]
-        );
-        let flow: Flow = flowfile.into();
+        // tracing::debug!(
+        //     "wrote flow file at {:#?}",
+        //     &[
+        //         "flows",
+        //         new_dir_str,
+        //         &format!("{}.toml", lowercased_flow_name),
+        //     ]
+        // );
+        // let flow: Flow = flowfile.into();
         Ok(flow)
     }
 
@@ -326,13 +326,13 @@ impl Manager {
     /// Returns:
     ///
     /// a `CoordinatorResult` containing a `anything_graph::Flow` object.
-    pub async fn delete_flow(&self, flow_name: String) -> CoordinatorResult<String> {
-        let flow_name = self.flow_repo()?.delete_flow(flow_name.clone()).await?;
+    pub async fn delete_flow(&self, flow_id: String) -> CoordinatorResult<String> {
+        let flow_name = self.flow_repo()?.delete_flow(flow_id).await?;
 
-        let _ = self
-            .file_store
-            .delete_directory(&["flows", &flow_name])
-            .unwrap();
+        // let _ = self
+        //     .file_store
+        //     .delete_directory(&["flows", &flow_name])
+        //     .unwrap();
 
         Ok(flow_name)
     }
@@ -351,39 +351,39 @@ impl Manager {
         &mut self,
         flow_id: String,
         args: UpdateFlowArgs,
-    ) -> CoordinatorResult<anything_graph::Flow> {
+    ) -> CoordinatorResult<anything_persistence::StoredFlow> {
         tracing::trace!("Update flow with {flow_id} and {:#?}", args);
-        let new_flow_name = args.flow_name.clone();
-        let mut flow_repo = self.flow_repo()?;
+        // let new_flow_name = args.flow_name.clone();
+        let flow_repo = self.flow_repo()?;
 
-        let mut original_flow = flow_repo.get_flow_by_id(flow_id.clone()).await?;
-        let original_flow_name = original_flow.flow_name.clone();
+        // let mut original_flow = flow_repo.get_flow_by_id(flow_id.clone()).await?;
+        // let original_flow_name = original_flow.flow_name.clone();
 
-        tracing::trace!("original_flow: {:#?}", original_flow);
+        // tracing::trace!("original_flow: {:#?}", original_flow);
 
         // self.flow_repo()?.delete_flow(flow_id.clone()).await?;
 
-        let stored_flow = self.flow_repo()?.update_flow(flow_id.clone(), args).await?;
+        let stored_flow = flow_repo.update_flow(flow_id.clone(), args).await?;
 
-        original_flow.flow_name = stored_flow.flow_name.clone();
-        self.file_store
-            .rename_directory(&["flows", &original_flow_name], &["flows", &new_flow_name])
-            .expect("unable to rename flow directory");
+        // original_flow.flow_name = stored_flow.flow_name.clone();
+        // self.file_store
+        //     .rename_directory(&["flows", &original_flow_name], &["flows", &new_flow_name])
+        //     .expect("unable to rename flow directory");
 
-        let flow_str: String = toml::to_string(&stored_flow).expect("unable to convert to string");
+        // let flow_str: String = toml::to_string(&stored_flow).expect("unable to convert to string");
 
-        self.file_store
-            .write_file(
-                &["flows", &new_flow_name, &format!("flow.toml")],
-                flow_str.as_bytes(),
-            )
-            .expect("unable to write basic flow string");
-        let mut file_store = self.file_store.clone();
+        // self.file_store
+        //     .write_file(
+        //         &["flows", &new_flow_name, &format!("flow.toml")],
+        //         flow_str.as_bytes(),
+        //     )
+        //     .expect("unable to write basic flow string");
+        // let mut file_store = self.file_store.clone();
 
-        let flow = stored_flow
-            .get_flow(&mut file_store, &mut flow_repo)
-            .await?;
-        Ok(flow)
+        // let flow = stored_flow
+        //     .get_flow(&mut file_store, &mut flow_repo)
+        //     .await?;
+        Ok(stored_flow)
     }
 
     pub async fn create_flow_version(
@@ -411,12 +411,19 @@ impl Manager {
         Ok(db_flow_version)
     }
 
-    pub async fn execute_flow(&self, flow_name: String) -> CoordinatorResult<()> {
-        let flow = self.get_flow(flow_name).await?;
+    pub async fn execute_flow(
+        &self,
+        flow_id: String,
+        flow_version_id: String,
+    ) -> CoordinatorResult<()> {
+        let flow = self
+            .flow_repo()?
+            .get_flow_version_by_id(flow_id, flow_version_id)
+            .await?;
         let flow_actor = self.flow_actor().unwrap();
         // Send the execute flow message
         //TODO: re implement. got mad when i started fucking around with how we fetch and retrieve flows from db
-        cast!(flow_actor.clone(), FlowMessage::ExecuteFlow(flow)).unwrap();
+        cast!(flow_actor.clone(), FlowMessage::ExecuteFlowVersion(flow)).unwrap();
         // Give the flow a few milliseconds to execute
         Ok(())
     }
@@ -539,7 +546,7 @@ mod tests {
 
         let toml = r#"
         name = "SimpleFlow"
-        version = "0.1"
+        version = "0.0.1"
         description = "A simple flow that echos holiday cheer"
 
         [[nodes]]
@@ -677,20 +684,18 @@ mod tests {
         let manager = ready_rx.recv().await.unwrap();
 
         // Add a simple flow
-        let rpath = manager.file_store.store_path(&["flows"]);
-        add_flow_directory(rpath.clone(), "some-simple-flow");
+        let flow_version = add_simple_flow_from_fixtures(manager.clone(), "simple.toml").await;
         let _ = sleep(Duration::from_millis(SLEEP_TIME)).await;
 
         // the actual test
         let server_task = tokio::spawn(async move {
-            let flow = manager
-                .get_flow("some-simple-flow".to_string())
-                .await
-                .unwrap();
-
             let flow_actor = manager.flow_actor().unwrap();
             // Send the execute flow message
-            cast!(flow_actor.clone(), FlowMessage::ExecuteFlow(flow)).unwrap();
+            cast!(
+                flow_actor.clone(),
+                FlowMessage::ExecuteFlowVersion(flow_version.clone())
+            )
+            .unwrap();
             // Give the flow a few milliseconds to execute
             let _ = sleep(Duration::from_millis(SLEEP_TIME)).await;
 
@@ -702,7 +707,7 @@ mod tests {
             )
             .unwrap();
 
-            assert_eq!(res.len(), 1);
+            assert_eq!(res.len(), 3);
             let msg = res.first().unwrap();
             match msg {
                 ProcessorMessage::FlowTaskFinishedSuccessfully(task_name, result) => {
@@ -738,46 +743,18 @@ mod tests {
         let manager = ready_rx.recv().await.unwrap();
 
         // Add a simple flow
-        let file = get_fixtures_directory().join("simple.toml");
-        let test_flow = Flowfile::from_file(file).unwrap();
-        let flow: Flow = test_flow.into();
+        let flow_version = add_simple_flow_from_fixtures(manager.clone(), "simple.toml").await;
         let _ = sleep(Duration::from_millis(SLEEP_TIME)).await;
-        dbg!(flow.clone());
-
-        let flow_repo = manager.flow_repo().unwrap();
-        flow_repo
-            .create_flow(CreateFlow {
-                name: flow.name.clone(),
-                active: false,
-                version: None,
-            })
-            .await
-            .unwrap();
-
-        let flow_id = flow.flow_id.clone();
-        let flow_file: Flowfile = flow.clone().into();
-        let flow_definition: serde_json::Value = flow_file.into();
-
-        flow_repo
-            .create_flow_version(
-                flow_id.clone(),
-                CreateFlowVersion {
-                    name: flow.name.clone(),
-                    flow_id: flow_id.clone(),
-                    version: Some("0.0.1".to_string()),
-                    flow_definition: flow_definition.clone(),
-                    published: None,
-                    description: None,
-                },
-            )
-            .await
-            .unwrap();
 
         // the actual test
         let server_task = tokio::spawn(async move {
             let flow_actor = manager.flow_actor().unwrap();
             // Send the execute flow message
-            cast!(flow_actor.clone(), FlowMessage::ExecuteFlow(flow.into())).unwrap();
+            cast!(
+                flow_actor.clone(),
+                FlowMessage::ExecuteFlowVersion(flow_version.into())
+            )
+            .unwrap();
             // Give the flow a few milliseconds to execute
             let _ = sleep(Duration::from_millis(SLEEP_TIME)).await;
 
@@ -796,7 +773,7 @@ mod tests {
                     assert_eq!(task_name, "echo-cheer");
                     assert_eq!(result, "hello Jingle Bells");
                 }
-                _ => assert!(false, "unexpected message type"),
+                e => assert!(false, "unexpected message type: {e:?}"),
             };
             match messages.get(1).unwrap() {
                 ProcessorMessage::FlowTaskFinishedSuccessfully(task_name, result) => {
@@ -843,6 +820,52 @@ mod tests {
         runtime_config.base_dir = Some(tmpdir.clone());
         config.update_runtime_config(runtime_config);
         config
+    }
+
+    async fn add_simple_flow_from_fixtures(manager: Arc<Manager>, filename: &str) -> FlowVersion {
+        let flow_repo = manager.flow_repo().unwrap();
+        let res = manager
+            .file_store
+            .create_directory(&["flows", "some-simple-flow"]);
+        assert!(res.is_ok());
+        // let _rpath = manager.file_store.store_path(&["flows"]);
+        // add_flow_directory(rpath.clone(), "some-simple-flow");
+
+        // Save into file store
+        let file = get_fixtures_directory().join(filename);
+        let res = manager
+            .file_store
+            .copy_file(&file, &["flows", "some-simple-flow", "flow.toml"]);
+        assert!(res.is_ok());
+        let res = flow_repo
+            .clone()
+            .create_flow(CreateFlow {
+                name: "some-simple-flow".to_string(),
+                active: false,
+                version: None,
+            })
+            .await;
+        assert!(res.is_ok());
+
+        let flow_file = Flowfile::from_file(file).unwrap();
+        let definition = flow_file.into_json_string().unwrap();
+
+        let res = flow_repo
+            .clone()
+            .update_flow_version(
+                res.unwrap().flow_id,
+                "0.0.1".to_string(),
+                UpdateFlowVersion {
+                    version: Some("0.0.1".to_string()),
+                    flow_definition: Some(definition),
+                    published: None,
+                    description: None,
+                },
+            )
+            .await;
+        assert!(res.is_ok());
+
+        res.unwrap()
     }
 
     // async fn setup()

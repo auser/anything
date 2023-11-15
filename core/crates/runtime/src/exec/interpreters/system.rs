@@ -234,8 +234,13 @@ mod tests {
     #[test]
     fn test_from_execution_config() {
         let config = ExecuteConfigBuilder::default()
-            .runtime("bash -c --".to_string())
-            .args(vec!["--arg1".to_string(), "--arg2".to_string()])
+            .runtime("bash".to_string())
+            .args(vec![
+                "-c".to_string(),
+                "--".to_string(),
+                "--arg1".to_string(),
+                "--arg2".to_string(),
+            ])
             .build()
             .unwrap();
 

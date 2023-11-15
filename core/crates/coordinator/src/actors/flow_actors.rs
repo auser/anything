@@ -1,5 +1,5 @@
 use anything_common::{loop_with_timeout_or_message, AnythingConfig};
-use anything_persistence::{FlowRepoImpl, StoredFlow};
+use anything_persistence::{FlowRepoImpl, FlowVersion, StoredFlow};
 use anything_runtime::Runner;
 use anything_store::FileStore;
 use ractor::{async_trait, cast, Actor, ActorRef};
@@ -13,7 +13,7 @@ use super::update_actor::UpdateActorMessage;
 
 #[derive(Debug, Clone)]
 pub enum FlowMessage {
-    ExecuteFlow(StoredFlow),
+    ExecuteFlowVersion(FlowVersion),
 }
 
 pub struct FlowActor;
@@ -46,10 +46,9 @@ impl Actor for FlowActor {
         state: &mut Self::State,
     ) -> CoordinatorActorResult<()> {
         match message {
-            FlowMessage::ExecuteFlow(stored_flow) => {
+            FlowMessage::ExecuteFlowVersion(flow_version) => {
                 tracing::debug!("Execute flow");
-                dbg!("storef flow", stored_flow.clone());
-                self.execute_flow(stored_flow.clone(), state).await?;
+                self.execute_flow(flow_version.clone(), state).await?;
             }
         }
         Ok(())
@@ -59,22 +58,10 @@ impl Actor for FlowActor {
 impl FlowActor {
     async fn execute_flow(
         &self,
-        flow: StoredFlow,
+        flow_version: FlowVersion,
         state: &mut <FlowActor as Actor>::State,
     ) -> CoordinatorActorResult<()> {
-        // first, get the flow
-        let flow = flow
-            .get_flow(&mut state.file_store, &mut state.flow_repo)
-            .await?;
-        // let flow_version = state
-        //     .flow_repo
-        //     .get_flow_version_by_id(flow.flow_id, flow.version)
-        //     .await?;
-
-        // let flow_file = Flowfile::from_json(flow_version.flow_definition.to_string())?;
-        // let flow: anything_graph::Flow = flow_file.into();
-
-        dbg!(flow.clone());
+        let flow: anything_graph::Flow = flow_version.into();
 
         let runner = state.runner.clone();
         let max_parallelism = state.config.execution_config().max_parallelism;

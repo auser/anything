@@ -1,11 +1,11 @@
 import { invoke } from "@tauri-apps/api";
 import { UpdateFlowArgs } from "tauri-plugin-anything-tauri/webview-src";
-import { anything } from "./anything";
+import { anything } from "./anythingInit";
 import { Flow } from "../utils/flowTypes";
+export type { UpdateFlowArgs } from "tauri-plugin-anything-tauri/webview-src";
 
 export const getFlows = async () => {
   let res = await anything.getFlows();
-  console.log(`Got back from getFlows ${JSON.stringify(res)}`);
   return res;
 };
 
@@ -21,9 +21,7 @@ export async function updateFlow(flowId: string, args: UpdateFlowArgs) {
 }
 
 export async function updateFlowVersion(flowId: string, flow: Flow) {
-  console.log(
-    `updateFlowVersion called with ${flowId} and ${JSON.stringify(flow)}`
-  );
+  console.log(`updateFlowVersion called for flow_id: ${flowId}}`, flow);
   return await anything.updateFlowVersion(flowId, flow.version, {
     version: flow.version,
     flow_definition: JSON.stringify(flow),
@@ -33,8 +31,7 @@ export async function updateFlowVersion(flowId: string, flow: Flow) {
 }
 
 export async function deleteFlow(flowId: string) {
-  return true; //TODO:
-  // return await anything.deleteFlow(flowId);
+  return await anything.deleteFlow(flowId);
 }
 
 export const getFlow = async (flowId: string) => {
@@ -49,6 +46,13 @@ export const getFlowVersions = async (flowId: string) => {
   return await invoke("get_flow_versions", { flowId });
 };
 
+export const executeFlow = async (flowId: string, flowVersionId: string) => {
+  return await anything.executeFlow(flowId, flowVersionId);
+};
+
+export const stopExecution = async () => {
+  return await anything.stop();
+};
 // export const readToml = async (flow_id: string) => {
 //   return "";
 //   //TODO: debracated for now
@@ -61,4 +65,3 @@ export const getFlowVersions = async (flowId: string) => {
 //   //TODO: debrected for now
 //   // return await anything.writeTomle(flowId, toml);
 // };
-

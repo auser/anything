@@ -45,6 +45,10 @@ export class Anything {
     return await invoke("plugin:anything|update_flow", { flowId, args });
   }
 
+  async deleteFlow<T>(flowId: string): Promise<T> {
+    return await invoke("plugin:anything|delete_flow", { flowId });
+  }
+
   async updateFlowVersion<T>(
     flowId: string,
     flowVersionId: string,
@@ -63,7 +67,7 @@ export class Anything {
     });
   }
 
-  async executeFlow<T>(flowName: string): Promise<T> {
-    return await invoke("plugin:anything|execute_flow", { flowName });
+  async executeFlow<T>(flowId: string, flowVersionId: string): Promise<T> {
+    return await invoke("plugin:anything|execute_flow", { flowId, flowVersionId });
   }
 }

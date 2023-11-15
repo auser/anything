@@ -54,7 +54,7 @@ impl ExecutionPlugin for SystemShellPlugin {
         }
 
         // TODO: decide if we always want this or not
-        command.arg("-c");
+        // command.arg("-c");
 
         for (idx, arg) in config.args.clone().into_iter().enumerate() {
             let rendered_arg = match render_string(&format!("arg-{}", idx), &arg, &scope) {

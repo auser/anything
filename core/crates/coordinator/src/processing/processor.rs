@@ -97,6 +97,7 @@ impl Processor {
                         .await
                         .map_err(|e| CoordinatorError::ProcessorSendError(e.into()));
 
+                    dbg!(task.clone());
                     let task = Arc::new(task);
                     let res = run_task(runner.clone(), task.clone()).await;
 

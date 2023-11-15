@@ -30,6 +30,7 @@ import api from "../tauri_api/api";
 import { useFlowsContext } from "./FlowsProvider";
 import { Node as FlowNode } from "../utils/flowTypes";
 
+//TODO: use slugify style to give names based on node type "node_label_1" etc
 function findNextNodeId(nodes: any): string {
   // Return 1 if there are no nodes
   if (!nodes) {
@@ -68,9 +69,9 @@ interface FlowContextInterface {
   onDrop: (event: any, reactFlowWrapper: any) => void;
   addNode: (position: { x: number; y: number }, specialData?: any) => void;
   setReactFlowInstance: (instance: ReactFlowInstance | null) => void;
-  updateFlowFrontmatter: (flow_name: string, keysToUpdate: any) => void;
   readNodeConfig: (nodeId: string) => Promise<FlowNode | undefined>;
   writeNodeConfig: (nodeId: string, data: any) => Promise<FlowNode | undefined>;
+  getFlowDefinitionsFromReactFlowState: () => Flow;
 }
 
 export const FlowContext = createContext<FlowContextInterface>({
@@ -88,10 +89,10 @@ export const FlowContext = createContext<FlowContextInterface>({
   onDrop: () => {},
   addNode: () => {},
   setReactFlowInstance: () => {},
-  updateFlowFrontmatter: () => {},
   getTrigger: () => undefined,
   readNodeConfig: () => undefined,
   writeNodeConfig: () => undefined,
+  getFlowDefinitionsFromReactFlowState: () => undefined,
 });
 
 export const useFlowContext = () => useContext(FlowContext);
@@ -172,8 +173,20 @@ export const FlowProvider = ({ children }: { children: ReactNode }) => {
         event.dataTransfer.getData("nodeData")
       );
 
+      console.log("Dropped nodeData", nodeData);
+
       if (typeof nodeData === "undefined" || !nodeData) {
         return;
+      }
+
+      // only allow one trigger at a time
+      if (nodeData.trigger) {
+        console.log("Its a triggger");
+        const triggerNodeExists = nodes.some((node) => node.data.trigger);
+        if (triggerNodeExists) {
+          console.error("Only one trigger node is allowed at a time.");
+          return;
+        }
       }
 
       if (!reactFlowInstance) throw new Error("reactFlowInstance is undefined");
@@ -188,22 +201,6 @@ export const FlowProvider = ({ children }: { children: ReactNode }) => {
     [addNode]
   );
 
-  const updateFlowFrontmatter = async (
-    flow_name: string,
-    keysToUpdate: any
-  ) => {
-    try {
-      // if we are updating name in TOML we also need to update the folder name
-      if (keysToUpdate.name) {
-        await updateFlow(flow_name, keysToUpdate.name);
-      }
-      let flow_frontmatter = { ...flowFrontmatter, ...keysToUpdate };
-      setFlowFrontmatter(flow_frontmatter);
-    } catch (error) {
-      console.log("error updating flow frontmatter", error);
-    }
-  };
-
   const hydrateFlow = async () => {
     try {
       console.log("Fetch Flow By Name", flow_name);
@@ -214,10 +211,11 @@ export const FlowProvider = ({ children }: { children: ReactNode }) => {
         JSON.stringify(flow, null, 3)
       );
 
-      //TODO: these are shaped wrong
+      //TODO: these are shaped wrong not shaped as flows but can still pick up ids etc
       setFlowVersions(flow.versions);
 
       let newDef = flow.versions[0].flow_definition as Flow;
+
       //Pull out actions and trigger
       let _actions: Action[] = newDef.actions || [];
       let _trigger: Trigger | undefined = newDef.trigger || undefined;
@@ -252,15 +250,17 @@ export const FlowProvider = ({ children }: { children: ReactNode }) => {
       setNodes(_nodes);
 
       let fm = flow;
-      delete fm.versions;
-      //TODO: gross fix thow we do this
+
+      //TODO: not great. a bit hacky. fix when doing Flow Version Mangement
       fm.version = flow.latest_version_id;
+      fm.flow_version_id = flow.versions[0].flow_version_id;
+
+      delete fm.versions;
+
       console.log("FrontMatter saved", JSON.stringify(fm, null, 3));
       setFlowFrontmatter(fm);
 
-      //TODO: maybe last edited to pull in the version they where looking at last?
       setHydrated(true);
-      //TODO: get current version, maybe all versions
     } catch (e) {
       console.log("error in fetch flow", JSON.stringify(e, null, 3));
     }
@@ -289,6 +289,15 @@ export const FlowProvider = ({ children }: { children: ReactNode }) => {
     data: any
   ): Promise<FlowNode | undefined> => {
     try {
+      let updatedNodes = nodes.map((node) => {
+        // console.log("node in writeNodeConfig", node);
+        if (node.id === nodeId) {
+          return { ...node, data };
+        } else {
+          return node;
+        }
+      });
+      setNodes(updatedNodes);
       //TODO: actually update state.
       let reactFlowNode = nodes.find((node) => node.id === nodeId);
       return reactFlowNode?.data;
@@ -296,42 +305,43 @@ export const FlowProvider = ({ children }: { children: ReactNode }) => {
       console.log("error writing node config in FlowProvider", error);
     }
   };
+  const getFlowDefinitionsFromReactFlowState = (): Flow => {
+    let trigger;
+    let actions = [];
+
+    //Loop through all nodes
+    nodes.forEach((node) => {
+      let freshNode = {
+        ...node.data,
+        presentation: {
+          position: node.position,
+        },
+      };
+
+      if (node.data.trigger) {
+        trigger = freshNode as Trigger;
+      } else {
+        actions.push(freshNode as Action);
+      }
+    });
+
+    //create shape needed for backend
+    let newFlow: Flow = {
+      ...(flowFrontmatter as FlowFrontMatter),
+      trigger: trigger as Trigger,
+      actions: actions as Action[],
+      edges: edges as Edge[],
+    };
+
+    console.log("New Flow Definition", newFlow);
+
+    return newFlow;
+  };
 
   const synchronise = async () => {
     try {
-      let trigger;
-      let actions = [];
-
-      //Loop through all nodes
-      nodes.forEach((node) => {
-        let freshNode = {
-          ...node.data,
-          presentation: {
-            position: node.position,
-            width: node.width,
-            height: node.height,
-            // selected: node.selected, //this is like intermediate state. maybe leave out.will it work?
-            // dragging: node.dragging,
-            positionAboslute: node.positionAbsolute,
-          },
-        };
-
-        if (node.data.trigger === true) {
-          trigger = freshNode as Trigger;
-        } else {
-          actions.push(freshNode as Action);
-        }
-      });
-
-      //create shape needed for backend
-      let newFlow: Flow = {
-        ...(flowFrontmatter as FlowFrontMatter),
-        trigger,
-        actions,
-        edges: edges as Edge[],
-      };
-
-      console.log("New Flow Definition", newFlow);
+      console.log("Synchronising Flow in FlowProivders.tsx");
+      let newFlow = getFlowDefinitionsFromReactFlowState();
 
       //send
       let res = await api.flows.updateFlowVersion(
@@ -361,7 +371,7 @@ export const FlowProvider = ({ children }: { children: ReactNode }) => {
     // Set a new timer to write to TOML file
     timerRef.current = setTimeout(async () => {
       synchronise();
-    }, 200);
+    }, 100);
 
     // Clean up
     return () => {
@@ -417,9 +427,9 @@ export const FlowProvider = ({ children }: { children: ReactNode }) => {
         addNode,
         getTrigger,
         setReactFlowInstance,
-        updateFlowFrontmatter,
         readNodeConfig,
         writeNodeConfig,
+        getFlowDefinitionsFromReactFlowState,
       }}
     >
       {children}

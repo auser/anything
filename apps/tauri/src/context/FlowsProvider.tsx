@@ -11,23 +11,26 @@ import { Flow } from "../utils/flowTypes";
 import { UpdateFlowArgs } from "tauri-plugin-anything-tauri/webview-src";
 
 interface FlowsContextInterface {
-  flows: Flow[];
+  flows: any[];
   createNewFlow: () => void;
+  getFlows: () => void;
   deleteFlow: (flowName: string) => void;
   updateFlow: (flowId: string, args: UpdateFlowArgs) => void;
+  stopExecution: () => void;
 }
 
 export const FlowsContext = createContext<FlowsContextInterface>({
   flows: [],
-  createNewFlow: () => {},
+  createNewFlow: () => { },
+  getFlows: () => { },
   deleteFlow: () => {},
   updateFlow: () => {},
+  stopExecution: () => {},
 });
 
 export const useFlowsContext = () => useContext(FlowsContext);
 
 export const FlowsProvider = ({ children }: { children: ReactNode }) => {
-
   const [flows, setFlows] = useState<Flow[]>([]);
 
   //BUG: there is a bug where when you add new flows the names colide because we write files as names.
@@ -48,10 +51,10 @@ export const FlowsProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const deleteFlow = async (flowName: string): Promise<any> => {
+  const deleteFlow = async (flowId: string): Promise<any> => {
     //TODO: deal with situation where there are flow events in the db
     try {
-      await api.flows.deleteFlow(flowName);
+      await api.flows.deleteFlow(flowId);
     } catch (error) {
       console.error(error);
     } finally {
@@ -75,6 +78,14 @@ export const FlowsProvider = ({ children }: { children: ReactNode }) => {
     setFlows(res.flows);
   };
 
+  const setActive = async (flow_id: string, args: UpdateFlowArgs) => {
+    await api.flows.updateFlow(flow_id, args);
+  };
+
+  const stopExecution = async () => {
+    await api.flows.stopExecution();
+  };
+
   //Hydrate flows on launch
   useEffect(() => {
     getFlows();
@@ -84,9 +95,11 @@ export const FlowsProvider = ({ children }: { children: ReactNode }) => {
     <FlowsContext.Provider
       value={{
         flows,
+        getFlows, 
         createNewFlow,
         deleteFlow,
         updateFlow,
+        stopExecution,
       }}
     >
       {children}

@@ -7,7 +7,7 @@ use crate::error::{GraphError, GraphResult};
 use super::{flow::Flow, node::Task, trigger::Trigger};
 
 fn default_version() -> Option<String> {
-    Some("0.1".to_string())
+    Some("0.0.1".to_string())
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -119,12 +119,12 @@ mod tests {
     fn test_node_from_toml_slim() {
         let toml = r#"
         name = "SimpleFlow"
-        version = "0.1"
+        version = "0.0.1"
         description = "A simple flow that echos holiday cheer"
         "#;
         let flow = Flowfile::from_str(toml).unwrap();
         assert_eq!(flow.name, "SimpleFlow".to_string());
-        assert_eq!(flow.version, Some("0.1".to_string()));
+        assert_eq!(flow.version, Some("0.0.1".to_string()));
         assert_eq!(
             flow.description,
             Some("A simple flow that echos holiday cheer".to_string())
@@ -135,7 +135,7 @@ mod tests {
     fn test_node_from_toml_with_variables() {
         let toml = r#"
         name = "SimpleFlow"
-        version = "0.1"
+        version = "0.0.1"
         description = "A simple flow that echos holiday cheer"
 
         [variables]
@@ -158,7 +158,7 @@ mod tests {
     fn test_node_from_toml_with_an_environment() {
         let toml = r#"
         name = "SimpleFlow"
-        version = "0.1"
+        version = "0.0.1"
         description = "A simple flow that echos holiday cheer"
 
         [environment]
@@ -176,7 +176,7 @@ mod tests {
     fn test_node_from_toml_with_a_trigger() {
         let toml = r#"
         name = "SimpleFlow"
-        version = "0.1"
+        version = "0.0.1"
         description = "A simple flow that echos holiday cheer"
 
         [trigger]

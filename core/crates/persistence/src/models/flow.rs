@@ -175,8 +175,11 @@ impl FromRow<'_, SqliteRow> for FlowVersion {
 
 impl Into<anything_graph::Flow> for FlowVersion {
     fn into(self) -> anything_graph::Flow {
-        let defined_flow: anything_graph::Flow = serde_json::from_value(self.flow_definition)
+        let mut defined_flow: anything_graph::Flow = serde_json::from_value(self.flow_definition)
             .expect("unable to convert flow_definition into Flow");
+        for task in defined_flow.nodes.clone() {
+            defined_flow.add_node(task).unwrap();
+        }
         defined_flow
     }
 }
@@ -196,7 +199,7 @@ impl Default for CreateFlowVersion {
         Self {
             name: "".to_string(),
             flow_id: "".to_string(),
-            version: Some("0.0.0".to_string()),
+            version: Some("0.0.1".to_string()),
             flow_definition: serde_json::json!("{}"),
             published: Some(false),
             description: None,

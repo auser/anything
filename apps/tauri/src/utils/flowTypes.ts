@@ -1,4 +1,5 @@
 import { HandleProps, Edge, NodeProps } from "reactflow";
+import { v4 as uuidv4 } from "uuid";
 
 //Top level metadata about a flow
 //like you might see in a package explorer like NPM
@@ -6,7 +7,8 @@ export type FlowFrontMatter = {
   active: boolean; //processign state ( all on or all off kinda like pause and start )
   name: string;
   flow_id: string;
-  version: string; //the flow version this represents
+  flow_version_id: string;
+  version: string; //the flow version this represents Should be Semver someday
   username?: string; //for sharing online or in organization
   user_id?: string; //for sharing online or in organization
   description?: string;
@@ -38,14 +40,6 @@ interface BaseNode {
 // Presentation data only needed for react flow but we need all of it
 interface NodePresentation {
   position: {
-    x: number;
-    y: number;
-  };
-  width: number;
-  height: number;
-  selected: boolean;
-  dragging: boolean;
-  positionAbsolute: {
     x: number;
     y: number;
   };
@@ -97,8 +91,9 @@ export const MockNewFlows: Flow[] = [
     username: "Mock Author",
     user_id: "1",
     environment: "dev",
-    flow_id: "1",
-    version: "0.1",
+    flow_id: uuidv4(),
+    flow_version_id: uuidv4(),
+    version: "0.0.1",
     description:
       "This is a mock flow with approximately 3 lines of text that needs to be concatted for the user. Actually its closer to two lines",
     variables: [],
@@ -156,8 +151,9 @@ export const MockNewFlows: Flow[] = [
     username: "Mock Author",
     user_id: "1",
     environment: "dev",
-    flow_id: "1",
-    version: "0.1",
+    flow_id: uuidv4(),
+    flow_version_id: uuidv4(),
+    version: "0.0.1",
     description:
       "This is a mock flow with approximately 3 lines of text that needs to be concatted for the user. Actually its closer to two lines",
     variables: [],

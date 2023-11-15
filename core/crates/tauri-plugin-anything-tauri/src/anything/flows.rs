@@ -7,7 +7,7 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct GetFlowsResponse {
-    flows: Option<Vec<Flow>>,
+    flows: Option<Vec<StoredFlow>>,
 }
 
 #[tauri::command]
@@ -50,7 +50,7 @@ pub async fn get_flow_by_name(
 
 #[derive(Serialize)]
 pub struct CreateFlowResponse {
-    flow: Option<Flow>,
+    flow: Option<StoredFlow>,
 }
 
 #[tauri::command]
@@ -78,31 +78,31 @@ pub async fn create_flow(
     }
 }
 
-// #[derive(Serialize)]
-// pub struct DeleteFlowResponse {
-//     flow: Option<Flow>,
-// }
+#[derive(Serialize)]
+pub struct DeleteFlowResponse {
+    flow: Option<String>,
+}
 
-// #[tauri::command]
-// pub async fn delete_flow(
-//     state: tauri::State<'_, AnythingState>,
-//     flow_name: String,
-// ) -> FlowResult<DeleteFlowResponse> {
-//     match state.inner.try_lock() {
-//         Err(_e) => Err(Error::CoordinatorNotInitialized),
-//         Ok(ref inner) => match inner.delete_flow(flow_name).await {
-//             Ok(flow) => Ok(DeleteFlowResponse { flow: Some(flow) }),
-//             Err(e) => {
-//                 eprintln!("Error getting flows: {:?}", e);
-//                 Ok(DeleteFlowResponse { flow: None })
-//             }
-//         },
-//     }
-// }
+#[tauri::command]
+pub async fn delete_flow(
+    state: tauri::State<'_, AnythingState>,
+    flow_id: String,
+) -> FlowResult<DeleteFlowResponse> {
+    match state.inner.try_lock() {
+        Err(_e) => Err(Error::CoordinatorNotInitialized),
+        Ok(ref inner) => match inner.delete_flow(flow_id).await {
+            Ok(flow) => Ok(DeleteFlowResponse { flow: Some(flow) }),
+            Err(e) => {
+                eprintln!("Error getting flows: {:?}", e);
+                Ok(DeleteFlowResponse { flow: None })
+            }
+        },
+    }
+}
 
 #[derive(Serialize)]
 pub struct UpdateFlowResponse {
-    flow: Option<Flow>,
+    flow: Option<StoredFlow>,
 }
 
 #[tauri::command]
@@ -201,14 +201,15 @@ pub struct ExecuteFlowResponse {}
 #[tauri::command]
 pub async fn execute_flow(
     state: tauri::State<'_, AnythingState>,
-    flow_name: String,
+    flow_id: String,
+    flow_version_id: String
 ) -> FlowResult<ExecuteFlowResponse> {
     match state.inner.try_lock() {
         Err(e) => {
             tracing::error!("Error getting lock on coordinator: {:?}", e);
             Err(Error::CoordinatorNotInitialized)
         }
-        Ok(ref mut inner) => match inner.execute_flow(flow_name).await {
+        Ok(ref mut inner) => match inner.execute_flow(flow_id, flow_version_id).await {
             Ok(_flow) => {
                 tracing::debug!("Executed flow flow inside tauri plugin");
                 Ok(ExecuteFlowResponse {})
