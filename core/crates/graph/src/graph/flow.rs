@@ -37,7 +37,7 @@ impl Default for Flow {
         Self {
             flow_id: crate::core::id_alloc::alloc_uuid_string(),
             name: "default".to_string(),
-            version: "v0.0.1".to_string(),
+            version: "0.0.1".to_string(),
             description: "".to_string(),
             variables: RawVariables::default(),
             environment: RawEnvironment::default(),
@@ -132,6 +132,7 @@ impl Into<Flowfile> for Flow {
         flowfile.nodes = self.nodes;
         flowfile.variables = self.variables;
         flowfile.environment = self.environment;
+        flowfile.trigger = self.trigger;
 
         flowfile
     }

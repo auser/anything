@@ -1,4 +1,6 @@
 use anything_common::{loop_with_timeout_or_message, AnythingConfig};
+use anything_graph::Flowfile;
+use anything_persistence::{FlowRepo, FlowRepoImpl, StoredFlow};
 use anything_runtime::Runner;
 use anything_store::FileStore;
 use ractor::{async_trait, cast, Actor, ActorRef};
@@ -12,7 +14,7 @@ use super::update_actor::UpdateActorMessage;
 
 #[derive(Debug, Clone)]
 pub enum FlowMessage {
-    ExecuteFlow(anything_graph::Flow),
+    ExecuteFlow(StoredFlow),
 }
 
 pub struct FlowActor;
@@ -21,6 +23,7 @@ pub struct FlowActorState {
     pub runner: Runner,
     pub config: AnythingConfig,
     pub update_actor_ref: ActorRef<UpdateActorMessage>,
+    pub flow_repo: FlowRepoImpl,
 }
 
 #[async_trait]
@@ -44,9 +47,10 @@ impl Actor for FlowActor {
         state: &mut Self::State,
     ) -> CoordinatorActorResult<()> {
         match message {
-            FlowMessage::ExecuteFlow(flow) => {
+            FlowMessage::ExecuteFlow(stored_flow) => {
                 tracing::debug!("Execute flow");
-                self.execute_flow(flow.clone(), state).await?;
+                dbg!("storef flow", stored_flow.clone());
+                self.execute_flow(stored_flow.clone(), state).await?;
             }
         }
         Ok(())
@@ -56,9 +60,23 @@ impl Actor for FlowActor {
 impl FlowActor {
     async fn execute_flow(
         &self,
-        flow: anything_graph::Flow,
-        state: &<FlowActor as Actor>::State,
+        flow: StoredFlow,
+        state: &mut <FlowActor as Actor>::State,
     ) -> CoordinatorActorResult<()> {
+        // first, get the flow
+        let flow = flow
+            .get_flow(&mut state.file_store, &mut state.flow_repo)
+            .await?;
+        // let flow_version = state
+        //     .flow_repo
+        //     .get_flow_version_by_id(flow.flow_id, flow.version)
+        //     .await?;
+
+        // let flow_file = Flowfile::from_json(flow_version.flow_definition.to_string())?;
+        // let flow: anything_graph::Flow = flow_file.into();
+
+        dbg!(flow.clone());
+
         let runner = state.runner.clone();
         let max_parallelism = state.config.execution_config().max_parallelism;
         let mut processor = Processor::new(runner, flow);

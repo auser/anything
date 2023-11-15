@@ -6,16 +6,17 @@ export type FlowFrontMatter = {
   active: boolean; //processign state ( all on or all off kinda like pause and start )
   name: string;
   flow_id: string;
-  version: string;
-  username?: string;
-  user_id?: string;
+  version: string; //the flow version this represents
+  username?: string; //for sharing online or in organization
+  user_id?: string; //for sharing online or in organization
   description?: string;
+  variables?: Variable[]; //Global variables
+  environment: string; //Stub for future
 };
 
 //Configuration needed to display and run a Flow
 export interface Flow extends FlowFrontMatter {
-  variables?: Variable[]; //Global variables
-  environment: string; //Stub for future
+  active: boolean; //only one version may be
   trigger: Trigger; //Triggering
   actions: Action[]; //Processing
   edges: Edge[]; //Needed for BFS traversal and flow rendering

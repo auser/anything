@@ -118,6 +118,7 @@ impl TestFlowHelper {
         flow_version: String,
     ) -> CreateFlowVersion {
         CreateFlowVersion {
+            name: "test flow version".to_string(),
             flow_id,
             description: None,
             flow_definition: serde_json::json!("{}"),
@@ -230,7 +231,7 @@ pub(crate) fn add_flow_file_into_directory(path: PathBuf, name: &str) {
     let toml = format!(
         r#"
     name = "{}"
-    version = "v0.0.1"
+    version = "0.0.1"
     description = "test flow"
 
     [[nodes]]

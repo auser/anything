@@ -2,8 +2,9 @@ use anything_common::AnythingConfig;
 use anything_graph::{Flow, Flowfile};
 use anything_persistence::datastore::RepoImpl;
 use anything_persistence::{
-    create_sqlite_datastore_from_config_and_file_store, models::UpdateFlowArgs, CreateFlow,
-    CreateFlowVersion, EventRepoImpl, FlowRepo, FlowRepoImpl, FlowVersion, TriggerRepoImpl,
+    create_sqlite_datastore_from_config_and_file_store, CreateFlow, CreateFlowVersion,
+    EventRepoImpl, FlowRepo, FlowRepoImpl, FlowVersion, TriggerRepoImpl, UpdateFlowArgs,
+    UpdateFlowVersion,
 };
 use anything_runtime::{Runner, RuntimeConfig};
 use anything_store::FileStore;
@@ -151,6 +152,7 @@ impl Manager {
                 runner: self.runner.clone(),
                 config: self.config.clone(),
                 update_actor_ref: update_actor.clone(),
+                flow_repo: flow_repo.clone(),
             },
         )
         .await
@@ -214,25 +216,30 @@ impl Manager {
     ///
     /// * `name`: A string representing the name of the flow to retrieve.
     ///
-    /// Returns:
+    /// Returns:    
     ///
     /// The function `get_flow` returns a `CoordinatorResult` which can either be an `Ok` variant
     /// containing a `anything_graph::Flow` or an `Err` variant containing a
     /// `CoordinatorError::FlowNotFound` with the name of the flow as a string.
-    pub async fn get_flow(&self, name: String) -> CoordinatorResult<anything_graph::Flow> {
+    pub async fn get_flow(
+        &self,
+        name: String,
+    ) -> CoordinatorResult<anything_persistence::StoredFlow> {
         let flow_repo = self.flow_repo()?;
-        let mut file_store = self.file_store.clone();
+        // let mut file_store = self.file_store.clone();
         tracing::trace!("Get flow by name called in the manager: {:?}", name.clone());
         // Look for stored flow in database
         let flow = flow_repo.get_flow_by_name(name).await.map_err(|e| {
             tracing::error!("error when getting flow: {:#?}", e);
             CoordinatorError::PersistenceError(e)
         })?;
+        tracing::info!("db_flow: {:#?}", flow);
         // Get the flow from disk
-        let flow = flow.get_flow(&mut file_store).await.map_err(|e| {
-            tracing::error!("error when getting flow: {:#?}", e);
-            CoordinatorError::PersistenceError(e)
-        })?;
+        // let flow = flow.get_flow(&mut file_store).await.map_err(|e| {
+        //     tracing::error!("error when getting flow: {:#?}", e);
+        //     CoordinatorError::PersistenceError(e)
+        // })?;
+        tracing::info!("file_flow: {:#?}", flow);
         Ok(flow.into())
     }
 
@@ -384,10 +391,24 @@ impl Manager {
         Ok(stored_flow_version)
     }
 
+    pub async fn update_flow_version(
+        &mut self,
+        flow_id: String,
+        flow_version_id: String,
+        update_flow: UpdateFlowVersion,
+    ) -> CoordinatorResult<FlowVersion> {
+        let db_flow_version = self
+            .flow_repo()?
+            .update_flow_version(flow_id, flow_version_id, update_flow)
+            .await?;
+        Ok(db_flow_version)
+    }
+
     pub async fn execute_flow(&self, flow_name: String) -> CoordinatorResult<()> {
         let flow = self.get_flow(flow_name).await?;
         let flow_actor = self.flow_actor().unwrap();
         // Send the execute flow message
+        //TODO: re implement. got mad when i started fucking around with how we fetch and retrieve flows from db
         cast!(flow_actor.clone(), FlowMessage::ExecuteFlow(flow)).unwrap();
         // Give the flow a few milliseconds to execute
         Ok(())
@@ -719,7 +740,7 @@ mod tests {
         let server_task = tokio::spawn(async move {
             let flow_actor = manager.flow_actor().unwrap();
             // Send the execute flow message
-            cast!(flow_actor.clone(), FlowMessage::ExecuteFlow(flow)).unwrap();
+            cast!(flow_actor.clone(), FlowMessage::ExecuteFlow(flow.into())).unwrap();
             // Give the flow a few milliseconds to execute
             let _ = sleep(Duration::from_millis(SLEEP_TIME)).await;
 

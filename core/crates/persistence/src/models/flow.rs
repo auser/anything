@@ -1,6 +1,7 @@
 use crate::{
     error::{PersistenceError, PersistenceResult},
     models::model_types::default_bool,
+    FlowRepo, FlowRepoImpl,
 };
 use anything_common::tracing;
 use anything_graph::Flowfile;
@@ -41,11 +42,14 @@ impl FromRow<'_, SqliteRow> for StoredFlow {
 
         if column_names.contains(&"fv_flow_definition".to_string()) {
             let flow_def = row.get::<'_, String, &str>("fv_flow_definition");
+
+            let flow_definition: serde_json::Value = serde_json::from_str(&flow_def).unwrap();
             let flow_version = FlowVersion {
                 flow_id: flow_id.clone(),
+                flow_version_id: row.get::<'_, String, &str>("fv_flow_version_id"),
                 flow_version: row.get::<'_, String, &str>("fv_flow_version"),
                 description: row.get::<'_, Option<String>, &str>("fv_description"),
-                flow_definition: serde_json::from_str(&flow_def).unwrap(),
+                flow_definition,
                 checksum: row.get::<'_, String, &str>("fv_checksum"),
                 published: row.get::<'_, bool, &str>("fv_published"),
                 updated_at: row.get::<'_, Option<DateTime<Utc>>, &str>("fv_updated_at"),
@@ -116,41 +120,17 @@ impl Into<StoredFlow> for CreateFlow {
 impl StoredFlow {
     pub async fn get_flow(
         &self,
-        file_store: &mut FileStore,
+        // TODO: decide to save or not to disk? I don't think so
+        _file_store: &mut FileStore,
+        flow_repo: &mut FlowRepoImpl,
     ) -> PersistenceResult<anything_graph::Flow> {
-        let flow_path = file_store
-            .store_path(&["flows"])
-            .join(self.flow_name.clone());
+        let flow_version = flow_repo
+            .get_flow_version_by_id(self.flow_id.clone(), self.latest_version_id.clone())
+            .await?;
 
-        tracing::trace!("flow_path: {:?}", flow_path);
+        let flow: anything_graph::Flow = flow_version.into();
 
-        let files_in_flow_dir = file_store
-            .get_files_in_dir(&[&flow_path.as_os_str().to_str().unwrap()], &["toml"])
-            .await
-            .map_err(|e| PersistenceError::StoreError(e))?;
-
-        let flow_file_path = files_in_flow_dir.iter().find(|f| {
-            tracing::debug!("{:?}", f.display());
-            f.file_name().unwrap().to_str().unwrap().starts_with("flow")
-        });
-
-        match flow_file_path {
-            Some(flow_file) => {
-                let flow_file = Flowfile::from_file(flow_file.to_path_buf()).expect(
-                    format!(
-                        "unable to create a Flowfile from file: {}",
-                        flow_file.display()
-                    )
-                    .as_str(),
-                );
-                let flow = flow_file.into();
-                Ok(flow)
-            }
-            None => Err(PersistenceError::FlowNotFound(format!(
-                "Flow not found in path: {:?}",
-                flow_path
-            ))),
-        }
+        Ok(flow)
     }
 }
 
@@ -165,6 +145,7 @@ pub struct CreateFlow {
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct FlowVersion {
     pub flow_id: FlowId,
+    pub flow_version_id: String,
     pub flow_version: String,
     pub description: Option<String>,
     pub flow_definition: serde_json::Value,
@@ -177,6 +158,7 @@ impl FromRow<'_, SqliteRow> for FlowVersion {
     fn from_row(row: &'_ SqliteRow) -> Result<Self, sqlx::Error> {
         let flow_id = row.get::<'_, String, &str>("flow_id");
         let flow_version = row.get::<'_, String, &str>("flow_version");
+        let flow_version_id = row.get::<'_, String, &str>("flow_version_id");
 
         let flow_definition = row.get::<'_, String, &str>("flow_definition");
         let description = row.get::<'_, Option<String>, &str>("description");
@@ -186,6 +168,7 @@ impl FromRow<'_, SqliteRow> for FlowVersion {
 
         Ok(FlowVersion {
             flow_id,
+            flow_version_id,
             flow_version,
             flow_definition: serde_json::from_str(&flow_definition).unwrap(),
             description,
@@ -196,8 +179,17 @@ impl FromRow<'_, SqliteRow> for FlowVersion {
     }
 }
 
+impl Into<anything_graph::Flow> for FlowVersion {
+    fn into(self) -> anything_graph::Flow {
+        let defined_flow: anything_graph::Flow = serde_json::from_value(self.flow_definition)
+            .expect("unable to convert flow_definition into Flow");
+        defined_flow
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct CreateFlowVersion {
+    pub name: String,
     pub flow_id: FlowId,
     pub version: Option<String>,
     pub flow_definition: serde_json::Value,
@@ -208,8 +200,9 @@ pub struct CreateFlowVersion {
 impl Default for CreateFlowVersion {
     fn default() -> Self {
         Self {
+            name: "".to_string(),
             flow_id: "".to_string(),
-            version: Some("0.0.1".to_string()),
+            version: Some("0.0.0".to_string()),
             flow_definition: serde_json::json!("{}"),
             published: Some(false),
             description: None,
@@ -220,8 +213,9 @@ impl Default for CreateFlowVersion {
 impl Into<CreateFlowVersion> for CreateFlow {
     fn into(self) -> CreateFlowVersion {
         CreateFlowVersion {
+            name: self.name.clone(),
             flow_id: self.name.clone(),
-            version: Some("v0.0.0".to_string()),
+            version: self.version,
             flow_definition: serde_json::json!("{}"),
             published: Some(false),
             description: None,
@@ -272,12 +266,12 @@ mod tests {
     fn test_conversion_from_graph_flow_into_stored_flow() {
         let flow = anything_graph::FlowBuilder::default()
             .name("some-flow".to_string())
-            .version("v0.1.1".to_string())
+            .version("0.1.1".to_string())
             .build()
             .unwrap();
 
         let stored_flow: StoredFlow = flow.into();
         assert_eq!(stored_flow.flow_name, "some-flow".to_string());
-        assert_eq!(stored_flow.latest_version_id, "v0.1.1".to_string());
+        assert_eq!(stored_flow.latest_version_id, "0.1.1".to_string());
     }
 }

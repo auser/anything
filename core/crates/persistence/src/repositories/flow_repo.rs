@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use anything_common::{hashing::hash_string_sha256, tracing};
 use chrono::Utc;
+use serde_json::json;
 use sqlx::Row;
 
 use crate::datastore::{Datastore, DatastoreTrait, RepoImpl};
@@ -18,6 +19,7 @@ SELECT  f.flow_id,
         f.active, 
         f.updated_at,
         fv.flow_version AS fv_flow_version,
+        fv.flow_version_id AS fv_flow_version_id,
         fv.description AS fv_description,
         fv.flow_version AS fv_version,
         fv.checksum AS fv_checksum,
@@ -110,7 +112,7 @@ impl FlowRepo for FlowRepoImpl {
         let mut tx = self.get_transaction().await?;
 
         let flow_id = uuid::Uuid::new_v4().to_string();
-        let flow_version = "v0.0.0".to_string();
+        let flow_version = "0.0.0".to_string();
 
         let saved_flow = self
             .internal_save(&mut tx, flow_id, flow_version.clone(), create_flow.into())
@@ -354,18 +356,13 @@ impl FlowRepo for FlowRepoImpl {
     async fn update_flow_version(
         &self,
         flow_id: FlowId,
-        flow_version: FlowVersionId,
-        update_flow_version: UpdateFlowVersion,
+        flow_version_id: FlowVersionId,
+        update_flow: UpdateFlowVersion,
     ) -> PersistenceResult<FlowVersion> {
         let mut tx = self.get_transaction().await?;
 
         let res = self
-            .internal_update_existing_flow_version(
-                &mut tx,
-                flow_id,
-                flow_version,
-                update_flow_version,
-            )
+            .internal_update_existing_flow_version(&mut tx, flow_id, flow_version_id, update_flow)
             .await?;
 
         tx.commit().await?;
@@ -474,9 +471,17 @@ impl FlowRepoImpl {
 
         let flow_id: String = row.get("flow_id");
 
-        let save_flow_version: CreateFlowVersion = create_flow.into();
+        let mut save_flow_version: CreateFlowVersion = create_flow.into();
+        save_flow_version.flow_definition = json!(format!(
+            r#"{{
+                "name": "{flow_name}",
+                "flow_id": "{flow_id}",
+                "nodes": []
+            }}"#
+        ));
 
-        self.internal_save_flow_version(tx, flow_id.clone(), save_flow_version)
+        let _res = self
+            .internal_save_flow_version(tx, flow_id.clone(), save_flow_version)
             .await?;
 
         match self.internal_find_existing_flow_by_id(tx, flow_id).await {
@@ -540,23 +545,31 @@ impl FlowRepoImpl {
         create_flow_version: CreateFlowVersion,
     ) -> PersistenceResult<FlowVersionId> {
         let create_flow_clone = create_flow_version.clone();
+
         // TODO: decide if this is how we want to handle the input or not
         let input = format!(
-            r#"{{"id": "{}", "version": "{}", "description": "{}"}}"#,
+            r#"{{"name": "{}", "id": "{}", "version": "{}", "description": "{}", "nodes": []}}"#,
+            create_flow_version.name.clone(),
             flow_id.clone(),
             create_flow_version.version.unwrap_or("0.0.1".to_string()),
-            create_flow_version.description.unwrap_or_default()
+            create_flow_version
+                .description
+                .unwrap_or(create_flow_version.name)
         );
         let checksum = hash_string_sha256(input.as_str())?;
+
+        let flow_version_id = uuid::Uuid::new_v4().to_string();
+
         // Create flow version
         let row = sqlx::query(
             r#"
-        INSERT INTO flow_versions (flow_id, flow_version, description, checksum, flow_definition, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        INSERT INTO flow_versions (flow_id, flow_version_id, flow_version, description, checksum, flow_definition, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, $7)
         RETURNING flow_version
             "#,
         )
         .bind(flow_id.clone())
+        .bind(flow_version_id)
         .bind(create_flow_clone.version)
         .bind(create_flow_clone.description)
         .bind(checksum)
@@ -572,7 +585,7 @@ impl FlowRepoImpl {
         &self,
         tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
         flow_id: FlowId,
-        flow_version: FlowVersionId,
+        flow_version_id: FlowVersionId,
         update_flow_version: UpdateFlowVersion,
     ) -> PersistenceResult<FlowVersion> {
         let current_flow_version = sqlx::query_as::<_, FlowVersion>(
@@ -581,7 +594,7 @@ impl FlowRepoImpl {
             "#,
         )
         .bind(flow_id.clone())
-        .bind(flow_version.clone())
+        .bind(flow_version_id.clone())
         .fetch_one(&mut **tx)
         .await
         .map_err(|e| PersistenceError::DatabaseError(e))?;
@@ -616,7 +629,7 @@ impl FlowRepoImpl {
         .bind(published)
         .bind(checksum)
         .bind(definition)
-        .bind(flow_version.clone())
+        .bind(flow_version_id.clone())
         .bind(flow_id.clone())
         .fetch_one(&mut **tx)
         .await
@@ -887,7 +900,7 @@ mod tests {
         assert!(res.is_ok());
 
         let create_flow_version = test_helper
-            .make_flow_version(flow_name.clone(), format!("v0.0.{}", 1))
+            .make_flow_version(flow_name.clone(), format!("0.0.{}", 1))
             .await;
         let res = flow_repo
             .create_flow_version(flow_name.clone(), create_flow_version.clone())
@@ -911,7 +924,7 @@ mod tests {
 
         let alpha_flow_id = flow_ids.get("alpha").unwrap().clone();
         let create_flow_version = test_helper
-            .make_flow_version(alpha_flow_id.clone(), format!("v0.0.{}", 1))
+            .make_flow_version(alpha_flow_id.clone(), format!("0.0.{}", 1))
             .await;
         let flow_version = flow_repo
             .create_flow_version(alpha_flow_id.clone(), create_flow_version.clone())
@@ -925,21 +938,16 @@ mod tests {
             .unwrap();
 
         assert_eq!(flow_version.flow_id, flow.flow_id);
-        assert_eq!(flow_version.flow_version, "v0.0.1");
+        assert_eq!(flow_version.flow_version, "0.0.1");
 
         let flow_version = flow_repo
-            .get_flow_version_by_id(alpha_flow_id.clone(), "v0.0.0".to_string())
+            .get_flow_version_by_id(alpha_flow_id.clone(), "0.0.0".to_string())
             .await;
         assert!(flow_version.is_ok());
 
         let flow_version = flow_version.unwrap();
-        // Get the flow associted with the flow_version
-        let flow = test_helper
-            .get_flow_by_id(flow_version.flow_id.clone())
-            .await
-            .unwrap();
-        assert_eq!(flow_version.flow_id, flow.flow_id);
-        assert_eq!(flow_version.flow_version, "v0.0.0");
+        assert_eq!(flow_version.flow_id, alpha_flow_id);
+        assert_eq!(flow_version.flow_version, "0.0.0");
     }
 
     #[tokio::test]
@@ -1020,7 +1028,7 @@ mod tests {
 
         // Create a new flow version (not the default, altough that would work as well)
         let create_flow_version = test_helper
-            .make_flow_version(flow_name.clone(), format!("v0.0.{}", 1))
+            .make_flow_version(flow_name.clone(), format!("0.0.{}", 1))
             .await;
         let res = flow_repo
             .create_flow_version(flow_name.clone(), create_flow_version.clone())
@@ -1029,7 +1037,7 @@ mod tests {
 
         // BEFORE UPDATE
         let flow_version = flow_repo
-            .get_flow_version_by_id(flow_name.clone(), "v0.0.1".to_string())
+            .get_flow_version_by_id(flow_name.clone(), "0.0.1".to_string())
             .await;
         assert!(flow_version.is_ok());
         let original_flow_version = flow_version.unwrap();
@@ -1044,7 +1052,7 @@ mod tests {
         };
 
         let res = flow_repo
-            .update_flow_version(flow_name.clone(), "v0.0.1".to_string(), update_flow_version)
+            .update_flow_version(flow_name.clone(), "0.0.1".to_string(), update_flow_version)
             .await;
         assert!(res.is_ok());
         let new_flow_version = res.unwrap();
@@ -1075,7 +1083,7 @@ mod tests {
         // Create the flow on the file system and in the database
         let flow_name = "test".to_string();
         let create_flow = test_helper.make_create_flow(flow_name.clone()).await;
-        let _res = flow_repo.create_flow(create_flow.clone()).await;
+        let stored_flow = flow_repo.create_flow(create_flow.clone()).await.unwrap();
 
         // Two files in the directory
         add_flow_directory(file_store.store_path(&["flows"]), flow_name.as_str());
@@ -1085,12 +1093,15 @@ mod tests {
         );
 
         // Now get the flow from the database
-        let stored_flow = flow_repo.get_flow_by_name(flow_name.clone()).await.unwrap();
-        let flow = stored_flow.get_flow(&mut file_store).await.unwrap();
+        // let stored_flow = flow_repo.get_flow_by_name(flow_name.clone()).await.unwrap();
+        let flow = stored_flow
+            .get_flow(&mut file_store, &mut flow_repo.clone())
+            .await
+            .unwrap();
 
         assert_eq!(flow.name, "test".to_string());
-        assert_eq!(flow.version, "v0.0.1".to_string());
-        assert_eq!(flow.description, "test flow".to_string());
+        assert_eq!(flow.version, "0.0.0".to_string());
+        assert_eq!(flow.description, "test".to_string());
     }
 
     #[tokio::test]
@@ -1134,7 +1145,7 @@ mod tests {
 
         // Create first version
         let create_flow_version = test_helper
-            .make_flow_version(flow_id.clone(), format!("v0.0.{}", 1))
+            .make_flow_version(flow_name.clone(), format!("0.0.{}", 1))
             .await;
         let res = flow_repo
             .create_flow_version(flow_id.clone(), create_flow_version.clone())
@@ -1143,7 +1154,7 @@ mod tests {
 
         // Create a second version
         let create_flow_version = test_helper
-            .make_flow_version(flow_id.clone(), format!("v0.0.{}", 2))
+            .make_flow_version(flow_name.clone(), format!("0.0.{}", 2))
             .await;
         let res = flow_repo
             .create_flow_version(flow_id.clone(), create_flow_version.clone())
@@ -1158,7 +1169,7 @@ mod tests {
 
         // Delete the first version
         let res = flow_repo
-            .delete_flow_version("v0.0.1".to_string())
+            .delete_flow_version("0.0.1".to_string())
             .await
             .unwrap();
         assert!(res);

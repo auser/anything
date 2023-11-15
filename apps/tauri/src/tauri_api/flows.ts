@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api";
 import { UpdateFlowArgs } from "tauri-plugin-anything-tauri/webview-src";
 import { anything } from "./anything";
+import { Flow } from "../utils/flowTypes";
 
 export const getFlows = async () => {
   let res = await anything.getFlows();
@@ -17,6 +18,18 @@ export const createFlow = async (flowName: string) => {
 
 export async function updateFlow(flowId: string, args: UpdateFlowArgs) {
   return await anything.updateFlow(flowId, args);
+}
+
+export async function updateFlowVersion(flowId: string, flow: Flow) {
+  console.log(
+    `updateFlowVersion called with ${flowId} and ${JSON.stringify(flow)}`
+  );
+  return await anything.updateFlowVersion(flowId, flow.version, {
+    version: flow.version,
+    flow_definition: JSON.stringify(flow),
+    published: false,
+    description: flow.description,
+  });
 }
 
 export async function deleteFlow(flowId: string) {
@@ -36,31 +49,16 @@ export const getFlowVersions = async (flowId: string) => {
   return await invoke("get_flow_versions", { flowId });
 };
 
-export const readToml = async (flow_id: string) => {
-  return "";
-  //TODO:
-  // return await anything.readToml(flowId);
-  // return await invoke("read_toml", { flow_id });
-};
+// export const readToml = async (flow_id: string) => {
+//   return "";
+//   //TODO: debracated for now
+//   // return await anything.readToml(flowId);
+//   // return await invoke("read_toml", { flow_id });
+// };
 
-export const writeToml = async (flowId: string, toml: string) => {
-  return true;
-  //TODO:
-  // return await anything.writeTomle(flowId, toml);
-};
+// export const writeToml = async (flowId: string, toml: string) => {
+//   return true;
+//   //TODO: debrected for now
+//   // return await anything.writeTomle(flowId, toml);
+// };
 
-export const readNodeConfig = async (flowId: string, nodeId: string) => {
-  return true;
-  //TODO:
-  // return await anything.readNodeConfig(flowId, nodeId);
-};
-
-export const writeNodeConfig = async (
-  flowId: string,
-  nodeId: string,
-  config: string
-) => {
-  return true;
-  //TODO:
-  // return await anything.wrtieNodeConfig(flowId, nodeId, config);
-};
