@@ -106,7 +106,7 @@ impl TryFrom<&PluginEngine> for ExecuteConfig {
 
     fn try_from(value: &PluginEngine) -> Result<Self, Self::Error> {
         Ok(Self {
-            plugin_name: "system-shell".to_string(),
+            plugin_name: "shell".to_string(),
             runtime: value.engine.clone(),
             args: value.args.clone().unwrap_or_default(),
             options: value
@@ -155,10 +155,11 @@ impl FromStr for EngineKind {
                             // If the interpreter is a shell, we need to set the runtime to system-shell
                             // This is a little hacky, but it allows the user to set the specific shell
                             // to execute in the system plugin
-                            let mut system_plugin = PluginEngine::get_from_string("system-shell")
+                            let mut system_plugin = PluginEngine::get_from_string("shell")
                                 .ok_or(RuntimeError::InvalidInterpreter)?;
                             let value = EngineOption::String(possible_shell.to_string());
                             system_plugin.options.insert("shell".to_string(), value);
+
                             Ok(Self::PluginEngine(system_plugin))
                         } else if let Some(plugin) = PluginEngine::get_from_string(possible_shell) {
                             Ok(Self::PluginEngine(plugin))
@@ -198,7 +199,7 @@ mod tests {
         assert_eq!(
             engine,
             EngineKind::PluginEngine(PluginEngine {
-                engine: "system-shell".to_string(),
+                engine: "shell".to_string(),
                 args: Some(vec![]),
                 options: indexmap::indexmap! {
                     "shell".to_string() => EngineOption::String("bash".to_string())

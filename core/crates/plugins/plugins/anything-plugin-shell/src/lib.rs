@@ -15,7 +15,7 @@ pub struct SystemShellPlugin {
 
 impl Plugin for SystemShellPlugin {
     fn name(&self) -> &'static str {
-        "system-shell"
+        "shell"
     }
 
     fn on_load(&mut self, config: RuntimeConfig) {

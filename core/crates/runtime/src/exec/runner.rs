@@ -102,18 +102,30 @@ impl Runner {
             .try_lock()
             .map_err(|_| RuntimeError::RuntimeError)?;
 
-        let plugin = pm.get_plugin(&plugin_name)?;
+        match pm.get_plugin(&plugin_name) {
+            Ok(plugin) => {
+                debug!("Plugin {} already loaded", plugin_name);
+                let mut scope = child_scope(Arc::clone(&self.global_scope), &stage_name);
 
-        let mut scope = child_scope(Arc::clone(&self.global_scope), &stage_name);
+                match plugin.execute(&scope, &execution_config) {
+                    Ok(res) => {
+                        scope.insert_result(stage_name, res.clone())?;
+                        self.global_scope = Arc::new(Mutex::new(scope));
 
-        match plugin.execute(&scope, &execution_config) {
-            Ok(res) => {
-                scope.insert_result(stage_name, res.clone())?;
-                self.global_scope = Arc::new(Mutex::new(scope));
-
-                Ok(self.global_scope.clone())
+                        Ok(self.global_scope.clone())
+                    }
+                    Err(e) => {
+                        tracing::error!("ERROR EXECUTING: {:#?}", e);
+                        Err(RuntimeError::PluginError(*e))
+                    }
+                }
             }
-            Err(e) => Err(RuntimeError::PluginError(*e)),
+            Err(_) => {
+                debug!("Plugin {} not loaded", plugin_name);
+                Err(RuntimeError::PluginError(crate::PluginError::NotFound(
+                    plugin_name,
+                )))
+            }
         }
     }
 
@@ -248,7 +260,7 @@ mod tests {
         let res = exec.load_plugins();
         assert!(res.is_ok());
         let loaded_plugins = exec.plugin_manager.try_lock().unwrap();
-        let is_loaded = loaded_plugins.get_plugin("system-shell");
+        let is_loaded = loaded_plugins.get_plugin("shell");
         assert!(is_loaded.is_ok());
     }
 

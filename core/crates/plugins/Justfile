@@ -7,18 +7,18 @@ artifact_directory := env_var_or_default('ARTIFACT_DIRECTORY', base_directory / 
 target_directory := base_directory / "target" / "release"
 
 # TODO: figure out a better way of handling this
-system_shell_dylib := target_directory / "libanything_plugin_system_shell.dylib"
+shell_dylib := target_directory / "libanything_plugin_shell.dylib"
 deno_plugin_dylib := target_directory / "libanything_plugin_deno.dylib"
 
 default:
   @just --list --justfile {{justfile()}}
 
-build-all: build-system-shell build-deno
+build-all: build-shell build-deno
 
 # Build system shell plugin
-build-system-shell: artifact-directory
-  cd {{ base_directory / "plugins/anything-plugin-system-shell" }} && cargo test && cargo build --release
-  @cp {{system_shell_dylib}} {{artifact_directory}}
+build-shell: artifact-directory
+  cd {{ base_directory / "plugins/anything-plugin-shell" }} && cargo test && cargo build --release
+  @cp {{shell_dylib}} {{artifact_directory}}
 
 build-deno: artifact-directory
   cd {{ base_directory / "plugins/anything-plugin-deno" }} && cargo test && cargo build --release
@@ -36,7 +36,7 @@ test-all: test-system-shell test-deno
 
 # Test the system shell plugin
 test-system-shell:
-  cd {{ base_directory / "plugins/anything-plugin-system-shell" }} && cargo test
+  cd {{ base_directory / "plugins/anything-plugin-shell" }} && cargo test
 
 # Test the deno plugin
 test-deno:

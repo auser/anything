@@ -189,7 +189,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "anything-plugin-system-shell"
+name = "anything-plugin-shell"
 version = "0.1.0"
 dependencies = [
  "anything-common",

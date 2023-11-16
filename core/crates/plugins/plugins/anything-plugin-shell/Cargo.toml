@@ -1,12 +1,12 @@
 [package]
-name = "anything-plugin-system-shell"
+name = "anything-plugin-shell"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-name = "anything_plugin_system_shell"
+name = "anything_plugin_shell"
 path = "src/lib.rs"
 
 crate-type = ["cdylib"]

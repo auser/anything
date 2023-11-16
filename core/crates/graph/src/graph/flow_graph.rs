@@ -456,7 +456,7 @@ pub mod test_helper {
             environment: anything_runtime::RawEnvironment::default(),
             engine: Some(anything_runtime::EngineKind::PluginEngine(
                 anything_runtime::PluginEngine {
-                    engine: "system-shell".to_string(),
+                    engine: "shell".to_string(),
                     args: Some(vec!["-c".to_string(), code]),
                     options: indexmap::indexmap! {},
                 },

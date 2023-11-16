@@ -16,7 +16,7 @@ variables = { cheers = "Jingle Bells" }
 
 [nodes.engine]
 engine = "bash"
-args = ["-c", 'echo \"hello {{cheers}}\"']
+args = ["-c", "echo 'hello {{cheers}}'"]
 
 [[nodes]]
 name = "say-cheers"

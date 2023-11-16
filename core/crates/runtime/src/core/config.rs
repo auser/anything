@@ -21,7 +21,7 @@ pub struct ExecuteConfig {
 impl Default for ExecuteConfig {
     fn default() -> Self {
         Self {
-            plugin_name: "system-shell".to_string(),
+            plugin_name: "shell".to_string(),
             runtime: "bash".to_string(),
             args: vec!["-c".to_string()],
             options: indexmap::IndexMap::new(),
@@ -35,7 +35,7 @@ impl TryFrom<EngineKind> for ExecuteConfig {
     fn try_from(value: EngineKind) -> Result<Self, Self::Error> {
         match value {
             EngineKind::Internal(internal_shell) => Ok(Self {
-                plugin_name: "system-shell".to_string(),
+                plugin_name: "shell".to_string(),
                 runtime: internal_shell.to_string(),
                 args: vec!["-c".to_string()],
                 options: indexmap::IndexMap::new(),
@@ -98,3 +98,6 @@ impl RuntimeConfig {
         self.base_dir().join("flow")
     }
 }
+
+#[cfg(test)]
+mod tests {}

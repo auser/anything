@@ -137,7 +137,7 @@ mod tests {
         assert_eq!(
             node.engine,
             Some(EngineKind::PluginEngine(PluginEngine {
-                engine: "system-shell".to_string(),
+                engine: "shell".to_string(),
                 args: Some(vec![]),
                 options: indexmap::indexmap! {
                     "shell".to_string() => crate::EngineOption::String("bash".to_string())
@@ -162,7 +162,7 @@ mod tests {
         assert_eq!(
             node.engine,
             Some(EngineKind::PluginEngine(PluginEngine {
-                engine: "system-shell".to_string(),
+                engine: "shell".to_string(),
                 args: None,
                 options: indexmap::indexmap! {
                     "shell".to_string() => crate::EngineOption::String("bash".to_string())
@@ -255,6 +255,36 @@ mod tests {
                 engine: "deno".to_string(),
                 args: Some(vec!["bob".to_string()]),
                 options: indexmap::indexmap! {}
+            }))
+        );
+    }
+
+    #[test]
+    fn test_load_with_args() {
+        let raw_toml = r#"
+name = "echo-cheer"
+label = "Holiday cheers"
+depends_on = []
+variables = { cheers = "Jingle Bells" }
+
+[engine]
+engine = "bash"
+args = ["-c", 'echo "hello {{cheers}}"']
+"#;
+        let node = RawNode::from_str(raw_toml);
+        assert!(node.is_ok());
+        let node = node.unwrap();
+        assert_eq!(
+            node.engine,
+            Some(EngineKind::PluginEngine(PluginEngine {
+                engine: "shell".to_string(),
+                args: Some(vec![
+                    "-c".to_string(),
+                    "echo \"hello {{cheers}}\"".to_string()
+                ]),
+                options: indexmap::indexmap! {
+                    "shell".to_string() => crate::EngineOption::String("bash".to_string())
+                }
             }))
         );
     }

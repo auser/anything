@@ -12,8 +12,8 @@ lazy_static! {
     pub static ref BUILT_IN_PLUGINS: HashMap<&'static str, PathBuf> = {
         HashMap::from([
             (
-                "system-shell",
-                LOCAL_PATH_DIRECTORY.join(format!("libanything_plugin_system_shell.dylib")),
+                "shell",
+                LOCAL_PATH_DIRECTORY.join(format!("libanything_plugin_shell.dylib")),
             ),
             (
                 "deno",

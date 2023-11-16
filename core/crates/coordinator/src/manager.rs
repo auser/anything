@@ -1,5 +1,4 @@
 use anything_common::AnythingConfig;
-use anything_graph::{Flow, Flowfile};
 use anything_persistence::datastore::RepoImpl;
 use anything_persistence::{
     create_sqlite_datastore_from_config_and_file_store, CreateFlow, CreateFlowVersion,
@@ -627,8 +626,11 @@ mod tests {
         let runtime = first_node.run_options.clone();
 
         let mut system_plugin_engine = PluginEngine::default();
-        system_plugin_engine.engine = "system-shell".to_string();
-        system_plugin_engine.args = Some(vec!["echo 'hello {{cheers}}'".to_string()]);
+        system_plugin_engine.engine = "shell".to_string();
+        system_plugin_engine.args = Some(vec![
+            "-c".to_string(),
+            "echo 'hello {{cheers}}'".to_string(),
+        ]);
         system_plugin_engine.options = indexmap::indexmap! {
             "shell".to_string() => EngineOption::from("bash".to_string())
         };
@@ -711,8 +713,8 @@ mod tests {
             let msg = res.first().unwrap();
             match msg {
                 ProcessorMessage::FlowTaskFinishedSuccessfully(task_name, result) => {
-                    assert_eq!(task_name, "echo");
-                    assert_eq!(result, "hello world");
+                    assert_eq!(task_name, "echo-cheer");
+                    assert_eq!(result, "hello Jingle Bells");
                 }
                 _ => assert!(false, "unexpected message type"),
             };
@@ -865,7 +867,9 @@ mod tests {
             .await;
         assert!(res.is_ok());
 
-        res.unwrap()
+        let flow_version = res.unwrap();
+
+        flow_version
     }
 
     // async fn setup()

@@ -156,13 +156,13 @@ mod tests {
     #[test]
     fn test_can_find_an_existing_built_in_plugin() {
         // let manager = PluginManager::new();
-        let p = PluginManager::find_plugin_library("system-shell");
+        let p = PluginManager::find_plugin_library("shell");
         assert!(p.is_ok());
         assert!(p
             .unwrap()
             .to_str()
             .unwrap()
-            .contains("plugins/artifacts/libanything_plugin_system_shell.dylib"));
+            .contains("plugins/artifacts/libanything_plugin_shell.dylib"));
     }
 
     #[test]
@@ -178,20 +178,16 @@ mod tests {
         let config = RuntimeConfig::default();
         let plugin_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../plugins/artifacts")
-            .join("libanything_plugin_system_shell.dylib");
+            .join("libanything_plugin_shell.dylib");
 
         unsafe {
             manager
-                .load_plugin(
-                    "system-shell",
-                    plugin_path.to_owned().into_os_string(),
-                    &config,
-                )
+                .load_plugin("shell", plugin_path.to_owned().into_os_string(), &config)
                 .unwrap();
         }
         assert_eq!(manager.plugins.len(), 1);
         assert_eq!(manager.loaded_libraries.len(), 1);
-        let p = manager.get_plugin("system-shell");
+        let p = manager.get_plugin("shell");
         assert!(p.is_ok());
     }
 }
