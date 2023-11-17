@@ -1,4 +1,5 @@
 use crate::{error::PersistenceResult, models::model_types::default_bool, FlowRepo, FlowRepoImpl};
+use anything_graph::Flowfile;
 use anything_store::FileStore;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -175,8 +176,11 @@ impl FromRow<'_, SqliteRow> for FlowVersion {
 
 impl Into<anything_graph::Flow> for FlowVersion {
     fn into(self) -> anything_graph::Flow {
-        let mut defined_flow: anything_graph::Flow = serde_json::from_value(self.flow_definition)
-            .expect("unable to convert flow_definition into Flow");
+        dbg!("flow_definition: {:?}", self.flow_definition.clone());
+        let flowfile = Flowfile::from_json(self.flow_definition.to_string())
+            .expect("unable to parse flow from flow_definition");
+        dbg!("flowfile: {:?}", flowfile.clone());
+        let mut defined_flow: anything_graph::Flow = flowfile.into();
         for task in defined_flow.nodes.clone() {
             defined_flow.add_node(task).unwrap();
         }

@@ -9,6 +9,7 @@ use anything_runtime::{Runner, RuntimeConfig};
 use anything_store::FileStore;
 use ractor::{cast, Actor, ActorRef};
 use std::{env::temp_dir, sync::Arc};
+use tracing::instrument::WithSubscriber;
 
 use tokio::sync::{
     mpsc::{self},
@@ -19,6 +20,7 @@ use crate::actors::flow_actors::{FlowActor, FlowActorState, FlowMessage};
 use crate::actors::system_actors::{SystemActor, SystemActorState, SystemMessage};
 use crate::actors::update_actor::{UpdateActor, UpdateActorMessage, UpdateActorState};
 use crate::error::CoordinatorResult;
+use crate::processing::processor::ProcessorMessage;
 use crate::CoordinatorError;
 
 #[derive(Debug, Clone)]
@@ -43,6 +45,8 @@ pub struct Manager {
     // pub shutdown_sender: Sender<()>,
     pub repositories: Option<Repositories>,
     pub actor_refs: Option<ActorRefs>,
+    // pub notification_rx: tokio::sync::mpsc::Receiver<UpdateActorMessage>,
+    // pub notification_tx: Option<Arc<tokio::sync::mpsc::Sender<UpdateActorMessage>>>,
 }
 
 impl Default for Manager {
@@ -82,7 +86,7 @@ impl Manager {
 
         // Create all the base directories required
         file_store.create_base_dir().unwrap();
-        for dir in &["flows", "database"] {
+        for dir in &["flows", "database", "plugins"] {
             file_store.create_directory(&[dir]).unwrap();
         }
 
@@ -92,6 +96,8 @@ impl Manager {
             config: config.clone(),
             repositories: None,
             actor_refs: None,
+            // notification_rx: notification_rx,
+            // notification_tx: Some(Arc::new(notification_tx)),
         }
     }
 
@@ -100,6 +106,8 @@ impl Manager {
         mut shutdown_rx: mpsc::Receiver<()>,
         ready_tx: mpsc::Sender<Arc<Self>>,
     ) -> CoordinatorResult<()> {
+        let (notification_tx, mut notification_rx) = tokio::sync::mpsc::channel(1024);
+
         // Setup persistence
         let datastore = create_sqlite_datastore_from_config_and_file_store(
             self.config.clone(),
@@ -138,6 +146,7 @@ impl Manager {
             UpdateActorState {
                 config: self.config.clone(),
                 latest_messages: Default::default(),
+                notification_tx,
             },
         )
         .await
@@ -170,10 +179,14 @@ impl Manager {
         ready_tx.send(Arc::new(self.clone())).await.unwrap();
 
         // never quit
+        // let mut notification_rx = &self.notification_rx;
         loop {
             // Never quit
             tokio::select! {
-
+                msg = notification_rx.recv() => {
+                    // Handle all update messages here
+                    tracing::debug!("Received update message: {:#?}", msg);
+                }
                 _ = shutdown_rx.recv() => {
                     break;
                 }

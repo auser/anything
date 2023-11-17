@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anything_common::AnythingConfig;
 use arraydeque::ArrayDeque;
 use ractor::{async_trait, Actor, ActorRef, RpcReplyPort};
@@ -13,6 +15,7 @@ pub enum UpdateActorMessage {
 pub struct UpdateActorState {
     pub config: AnythingConfig,
     pub latest_messages: ArrayDeque<ProcessorMessage, 32>,
+    pub notification_tx: tokio::sync::mpsc::Sender<ProcessorMessage>,
 }
 pub struct UpdateActor;
 
@@ -48,7 +51,8 @@ impl Actor for UpdateActor {
             }
             UpdateActorMessage::FlowLifecycle(msg) => {
                 let latest_messages = &mut state.latest_messages;
-                let _ = latest_messages.push_back(msg);
+                let _ = latest_messages.push_back(msg.clone());
+                state.notification_tx.send(msg).await?;
             }
         }
         Ok(())

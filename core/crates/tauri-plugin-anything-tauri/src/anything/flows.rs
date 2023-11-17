@@ -221,3 +221,27 @@ pub async fn execute_flow(
         },
     }
 }
+
+// #[tauri::command]
+// pub async fn execute_flow_by_name(
+//     state: tauri::State<'_, AnythingState>,
+//     flow_name: String,
+//     flow_version_id: String,
+// ) -> FlowResult<ExecuteFlowResponse> {
+//     match state.inner.try_lock() {
+//         Err(e) => {
+//             tracing::error!("Error getting lock on coordinator: {:?}", e);
+//             Err(Error::CoordinatorNotInitialized)
+//         }
+//         Ok(ref mut inner) => match inner.execute_flow_by_name(flow_name, flow_version_id).await {
+//             Ok(_flow) => {
+//                 tracing::debug!("Executed flow flow inside tauri plugin");
+//                 Ok(ExecuteFlowResponse {})
+//             }
+//             Err(e) => {
+//                 eprintln!("Error getting flows after executing flow: {:?}", e);
+//                 Ok(ExecuteFlowResponse {})
+//             }
+//         },
+//     }
+// }

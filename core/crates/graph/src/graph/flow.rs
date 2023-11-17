@@ -16,6 +16,7 @@ pub struct Flow {
 
     pub name: String,
     pub version: String,
+    #[serde(default)]
     pub description: String,
 
     #[serde(default)]

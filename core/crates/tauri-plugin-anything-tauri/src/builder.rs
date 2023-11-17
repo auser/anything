@@ -73,6 +73,14 @@ impl<R: Runtime> Builder<R> {
                             panic!("Failed to start anything");
                         }
                     };
+
+                    // TODO: Ari
+                    // tokio::spawn(async move {
+                    //     while let Some(msg) = arc_manager.notification_rx.recv() {
+                    //         app_handle.emit_all("processor_message", payload)
+                    //     }
+                    // });
+
                     let inner = match Arc::try_unwrap(arc_manager) {
                         Ok(inner) => Arc::new(Mutex::new(inner)),
                         Err(_) => {
@@ -85,6 +93,7 @@ impl<R: Runtime> Builder<R> {
                         stop_tx: Some(stop_tx),
                         anything_config,
                     };
+
                     println!("Anything is ready to go!");
                     app_handle.manage(init_state);
                 });
