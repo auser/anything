@@ -7,7 +7,7 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct GetFlowsResponse {
-    flows: Option<Vec<StoredFlow>>,
+    flows: Option<Vec<Flow>>,
 }
 
 #[tauri::command]
@@ -202,7 +202,7 @@ pub struct ExecuteFlowResponse {}
 pub async fn execute_flow(
     state: tauri::State<'_, AnythingState>,
     flow_id: String,
-    flow_version_id: String
+    flow_version_id: String,
 ) -> FlowResult<ExecuteFlowResponse> {
     match state.inner.try_lock() {
         Err(e) => {

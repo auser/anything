@@ -355,33 +355,8 @@ impl Manager {
         // let new_flow_name = args.flow_name.clone();
         let flow_repo = self.flow_repo()?;
 
-        // let mut original_flow = flow_repo.get_flow_by_id(flow_id.clone()).await?;
-        // let original_flow_name = original_flow.flow_name.clone();
-
-        // tracing::trace!("original_flow: {:#?}", original_flow);
-
-        // self.flow_repo()?.delete_flow(flow_id.clone()).await?;
-
         let stored_flow = flow_repo.update_flow(flow_id.clone(), args).await?;
 
-        // original_flow.flow_name = stored_flow.flow_name.clone();
-        // self.file_store
-        //     .rename_directory(&["flows", &original_flow_name], &["flows", &new_flow_name])
-        //     .expect("unable to rename flow directory");
-
-        // let flow_str: String = toml::to_string(&stored_flow).expect("unable to convert to string");
-
-        // self.file_store
-        //     .write_file(
-        //         &["flows", &new_flow_name, &format!("flow.toml")],
-        //         flow_str.as_bytes(),
-        //     )
-        //     .expect("unable to write basic flow string");
-        // let mut file_store = self.file_store.clone();
-
-        // let flow = stored_flow
-        //     .get_flow(&mut file_store, &mut flow_repo)
-        //     .await?;
         Ok(stored_flow)
     }
 
